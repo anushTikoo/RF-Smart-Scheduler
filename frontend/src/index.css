@@ -118,3 +118,36 @@
 * {
   scrollbar-width: none;
 }
+
+/* Flag Waving Animation & Cloth Rippling */
+@keyframes flagClothWave {
+  0%, 100% {
+    transform: perspective(300px) rotateY(0deg) skewY(0deg);
+  }
+  30% {
+    transform: perspective(300px) rotateY(-3.5deg) skewY(0.7deg);
+  }
+  70% {
+    transform: perspective(300px) rotateY(2.5deg) skewY(-0.5deg);
+  }
+}
+
+.flag-waving-anim {
+  animation: flagClothWave 4s ease-in-out infinite;
+  transform-origin: left center;
+}
+
+
+/* Upload Icon Floating Bounce on Hover */
+@keyframes uploadFloatBounce {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
+.group:hover .upload-hover-anim {
+  animation: uploadFloatBounce 0.55s ease-in-out 1;
+}

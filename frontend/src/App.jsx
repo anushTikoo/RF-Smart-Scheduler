@@ -4,65 +4,81 @@ import RadarScanner from './components/RadarScanner';
 import ObservationsSection from './components/ObservationsSection';
 import RLParametersAccordion from './components/RLParametersAccordion';
 import Toast from './components/Toast';
+import { subscribeTelemetry } from './services/telemetryService';
 
 export default function App() {
   // App states
   const [viewMode, setViewMode] = useState('receiver'); // 'receiver' | 'environment'
-  const [isScanning, setIsScanning] = useState(true);
-  const [isReplaying, setIsReplaying] = useState(false);
+  const [isScanning, setIsScanning] = useState(false); // Does NOT start instantly; starts only after dataset upload
   const [loadedDataset, setLoadedDataset] = useState(null);
   const [toastMessage, setToastMessage] = useState(null);
 
-  // Radar Scanner states
-  const [mlCurrentBand, setMlCurrentBand] = useState(7);
-  const [openLoopCurrentBand, setOpenLoopCurrentBand] = useState(4);
+  // Radar Scanner & Telemetry states (backend-connected / real-time streaming)
+  const [telemetrySource, setTelemetrySource] = useState('initializing');
+  const [mlCurrentBand, setMlCurrentBand] = useState(null);
+  const [openLoopCurrentBand, setOpenLoopCurrentBand] = useState(null);
+  const [actualEmissionBand, setActualEmissionBand] = useState(null);
+  const [emissionFrequency, setEmissionFrequency] = useState(null);
+  const [mlInterceptedFreq, setMlInterceptedFreq] = useState(null);
+  const [openLoopInterceptedFreq, setOpenLoopInterceptedFreq] = useState(null);
 
-  // Simulation metrics
+  // Simulation metrics for Receiver & Environment views (defaults to '-' before dataset upload)
   const [mlMetrics, setMlMetrics] = useState({
-    hitRate: '61.7%',
-    interceptPerSec: '0.72 /s',
-    totalHits: 432,
-    totalMisses: 268,
-    avgDelay: '0.48s'
+    interceptRate: '-',
+    hitRate: '-',
+    probDetection: '-',
+    avgInterceptDelay: '-',
+    totalHits: '-',
+    totalMisses: '-',
+    totalActualEmissions: '-',
   });
 
   const [openLoopMetrics, setOpenLoopMetrics] = useState({
-    hitRate: '24.3%',
-    interceptLag: '1.82 s',
-    totalHits: 168,
-    totalMisses: 532,
-    avgDelay: '1.82 s'
+    interceptRate: '-',
+    hitRate: '-',
+    probDetection: '-',
+    avgInterceptDelay: '-',
+    totalHits: '-',
+    totalMisses: '-',
+    totalActualEmissions: '-',
   });
 
-  // Replay mode animation loop
+  // Subscribe to live telemetry service (WebSocket / REST API with deterministic simulation fallback)
   useEffect(() => {
-    let interval = null;
-    if (isReplaying) {
-      const mlSequence = [7, 7, 9, 2, 7, 4, 6, 8, 7, 3];
-      let step = 0;
+    if (!isScanning) return;
 
-      interval = setInterval(() => {
-        step = (step + 1) % mlSequence.length;
-        setMlCurrentBand(mlSequence[step]);
-        setOpenLoopCurrentBand((prev) => (prev % 10) + 1);
+    const unsubscribe = subscribeTelemetry((snapshot) => {
+      if (!snapshot) return;
+      setTelemetrySource(snapshot.source || 'connected');
 
-        setMlMetrics((prev) => ({
-          ...prev,
-          totalHits: prev.totalHits + 1,
-          hitRate: `${(61.0 + Math.random() * 1.5).toFixed(1)}%`
-        }));
+      if (snapshot.environment) {
+        setActualEmissionBand(snapshot.environment.actualEmissionBand);
+        if (snapshot.environment.emissionFrequency) {
+          setEmissionFrequency(snapshot.environment.emissionFrequency);
+        }
+      }
 
-        setOpenLoopMetrics((prev) => ({
-          ...prev,
-          totalMisses: prev.totalMisses + 1,
-          hitRate: `${(24.0 + Math.random() * 0.8).toFixed(1)}%`
-        }));
-      }, 1200);
-    }
+      if (snapshot.adaptive) {
+        setMlCurrentBand(snapshot.adaptive.currentBand);
+        setMlInterceptedFreq(snapshot.adaptive.interceptedFrequency);
+        if (snapshot.adaptive.metrics) {
+          setMlMetrics(snapshot.adaptive.metrics);
+        }
+      }
+
+      if (snapshot.openLoop) {
+        setOpenLoopCurrentBand(snapshot.openLoop.currentBand);
+        setOpenLoopInterceptedFreq(snapshot.openLoop.interceptedFrequency);
+        if (snapshot.openLoop.metrics) {
+          setOpenLoopMetrics(snapshot.openLoop.metrics);
+        }
+      }
+    }, 1400);
+
     return () => {
-      if (interval) clearInterval(interval);
+      unsubscribe();
     };
-  }, [isReplaying]);
+  }, [isScanning]);
 
   const showToast = (msg) => {
     setToastMessage(msg);
@@ -73,112 +89,157 @@ export default function App() {
 
   const handleDatasetUpload = (file) => {
     setLoadedDataset(file);
-    showToast(`Dataset loaded: ${file.name} (${(file.size / 1024).toFixed(1)} KB)`);
+    setIsScanning(true); // Automatically starts running after uploading a dataset
+    showToast(`Dataset loaded: ${file.name}. Starting cognitive RF scan scheduler...`);
   };
 
-  const handleReplayToggle = () => {
-    const nextState = !isReplaying;
-    setIsReplaying(nextState);
-    if (nextState) {
-      showToast('Replay Simulation active (t=0s – 600s)');
-    } else {
-      showToast('Replay paused');
-      setMlCurrentBand(7);
-      setOpenLoopCurrentBand(4);
+  const handleTogglePause = () => {
+    if (!loadedDataset) {
+      showToast('Please upload a dataset (.h5) from the top-right header to start scanning.');
+      return;
     }
+    const nextState = !isScanning;
+    setIsScanning(nextState);
+    showToast(nextState ? 'Simulation resumed.' : 'Simulation paused.');
+  };
+
+  const handleClearSimulation = () => {
+    setLoadedDataset(null);
+    setIsScanning(false);
+    setMlCurrentBand(null);
+    setOpenLoopCurrentBand(null);
+    setActualEmissionBand(null);
+    setEmissionFrequency(null);
+    setMlInterceptedFreq(null);
+    setOpenLoopInterceptedFreq(null);
+    setMlMetrics({
+      interceptRate: '-',
+      hitRate: '-',
+      probDetection: '-',
+      avgInterceptDelay: '-',
+      totalHits: '-',
+      totalMisses: '-',
+      totalActualEmissions: '-',
+    });
+    setOpenLoopMetrics({
+      interceptRate: '-',
+      hitRate: '-',
+      probDetection: '-',
+      avgInterceptDelay: '-',
+      totalHits: '-',
+      totalMisses: '-',
+      totalActualEmissions: '-',
+    });
+    if (viewMode === 'environment') {
+      setViewMode('receiver');
+    }
+    showToast('Simulation cleared. Dataset unloaded.');
   };
 
   return (
-    <div className="bg-white font-body-md text-on-surface antialiased min-h-screen flex flex-col selection:bg-primary/20 selection:text-primary">
-      {/* Top Header */}
+    <div className="bg-[#F8FAFC] font-body-md text-on-surface antialiased min-h-screen flex flex-col selection:bg-primary/20 selection:text-primary">
+      {/* Top Header with Indian Flag Background, Saffron, White, Ashoka Chakra, and Green */}
       <Header
         viewMode={viewMode}
         setViewMode={setViewMode}
         onDatasetUpload={handleDatasetUpload}
         loadedDataset={loadedDataset}
+        isScanning={isScanning}
       />
 
       {/* Main Content Area */}
-      <main className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-1 flex flex-col gap-6 bg-white">
-        {/* Replay Mode / Scanning Toolbar */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center justify-end w-full">
-            {/* Live Scanning Status Pill */}
-            <div
-              className={`flex items-center gap-1.5 px-2.5 py-1 mr-3 rounded-full border font-label-md text-[11px] font-semibold select-none transition-colors ${
-                isScanning
-                  ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
-                  : 'bg-slate-100 border-slate-300 text-slate-600'
-              }`}
-            >
-              <span
-                className={`w-2 h-2 rounded-full ${
-                  isScanning ? 'bg-emerald-700 animate-pulse' : 'bg-slate-500'
-                }`}
-              ></span>
-              <span>{isScanning ? 'SCANNING' : 'PAUSED'}</span>
-            </div>
-
-            {/* Replay Button */}
-            <button
-              id="replay-btn"
-              type="button"
-              onClick={handleReplayToggle}
-              className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg border font-label-md text-xs font-medium shadow-[0_1px_3px_rgba(0,0,0,0.02)] transition-all cursor-pointer group ${
-                isReplaying
-                  ? 'bg-primary/10 border-primary text-primary'
-                  : 'bg-white border-slate-200/90 hover:border-primary/50 text-on-surface hover:text-primary'
-              }`}
-            >
-              {isReplaying ? (
-                <>
-                  <span className="material-symbols-outlined text-[17px] text-primary animate-spin">
-                    sync
-                  </span>
-                  <span>Replaying (0s-600s)...</span>
-                  <span className="px-1.5 py-0.5 bg-primary text-white rounded font-label-sm text-[10px] ml-0.5">
-                    ACTIVE
-                  </span>
-                </>
-              ) : (
-                <>
-                  <span className="material-symbols-outlined text-[17px] text-primary group-hover:rotate-[-45deg] transition-transform">
-                    replay
-                  </span>
-                  <span>Replay Mode</span>
-                  <span className="px-1.5 py-0.5 bg-slate-100 rounded font-label-sm text-[10px] text-outline ml-0.5">
-                    t=0s – 600s
-                  </span>
-                </>
-              )}
-            </button>
+      <main className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-1 flex flex-col gap-5">
+        {/* Simulation Control & Dataset Bar: Compact initially when no dataset loaded; controls only after upload */}
+        {!loadedDataset ? (
+          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-white border border-slate-200 shadow-[0_2px_8px_rgba(0,0,0,0.03)] self-start text-[12px] font-medium text-slate-600 select-none">
+            <span className="material-symbols-outlined text-[17px] text-primary">info</span>
+            <span>Upload a dataset <strong className="font-semibold text-slate-800">(.h5)</strong> from the header to begin simulation</span>
           </div>
-        </div>
+        ) : (
+          <div className="w-full flex flex-wrap items-center justify-between gap-3 px-4 sm:px-5 py-3 rounded-2xl bg-white border border-slate-200 shadow-[0_2px_10px_rgba(0,0,0,0.04)]">
+            {/* Active Dataset Name & Simulation Controls */}
+            <div className="flex flex-wrap items-center gap-2.5 sm:gap-3.5">
+              {/* Dataset Badge */}
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200/90 text-slate-700">
+                <span className="material-symbols-outlined text-[18px] text-primary">
+                  folder_open
+                </span>
+                <span className="font-label-sm text-[11px] uppercase text-slate-500 font-semibold tracking-wide">
+                  Dataset:
+                </span>
+                <span
+                  className="font-mono text-[12px] font-bold text-slate-900 truncate max-w-[200px] sm:max-w-xs"
+                  title={loadedDataset.name}
+                >
+                  {loadedDataset.name}
+                </span>
+              </div>
 
-        {/* Circular Radar Scanners Side-by-Side */}
+              {/* Pause / Resume Simulation Button */}
+              <button
+                onClick={handleTogglePause}
+                type="button"
+                className={`flex items-center gap-1 px-2.5 py-1 rounded-lg font-label-md text-[11px] font-medium transition-colors select-none cursor-pointer ${
+                  isScanning
+                    ? 'bg-slate-50 hover:bg-amber-50 text-slate-700 hover:text-amber-800 border border-slate-200 hover:border-amber-300'
+                    : 'bg-slate-50 hover:bg-emerald-50 text-slate-700 hover:text-emerald-800 border border-slate-200 hover:border-emerald-300'
+                }`}
+                title={isScanning ? 'Pause the ongoing simulation' : 'Resume scanning simulation'}
+              >
+                <span className="material-symbols-outlined text-[15px]">
+                  {isScanning ? 'pause' : 'play_arrow'}
+                </span>
+                <span>{isScanning ? 'Pause Simulation' : 'Resume Simulation'}</span>
+              </button>
+
+              {/* Stop / Clear Simulation Button */}
+              <button
+                onClick={handleClearSimulation}
+                type="button"
+                className="flex items-center gap-1 px-2.5 py-1 rounded-lg font-label-md text-[11px] font-medium text-slate-600 hover:text-rose-700 bg-slate-50 hover:bg-rose-50 border border-slate-200 hover:border-rose-200 transition-colors cursor-pointer select-none"
+                title="Stop simulation, unload dataset, and return to default state"
+              >
+                <span className="material-symbols-outlined text-[14px]">close</span>
+                <span>Stop Simulation</span>
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Circular Radar Scanners Side-by-Side (Each with its dedicated scanning badge & meaningful icon) */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Left Scanner: Adaptive ML Scan */}
           <RadarScanner
-            title="ADAPTIVE ML SCAN (DQN ε-GREEDY)"
+            title="ADAPTIVE ML SCAN"
             type="adaptive"
+            viewMode={viewMode}
             currentBand={mlCurrentBand}
+            actualEmissionBand={actualEmissionBand}
+            emissionFrequency={emissionFrequency}
+            interceptedFrequency={mlInterceptedFreq}
             metrics={mlMetrics}
-            onSelectBand={(bandId) => setMlCurrentBand(bandId)}
+            isScanning={isScanning}
+            hasDataset={!!loadedDataset}
           />
 
           {/* Right Scanner: Open Loop Scan */}
           <RadarScanner
-            title="OPEN LOOP SCAN (SEQUENTIAL SWEEP)"
+            title="OPEN LOOP SCAN"
             type="open-loop"
+            viewMode={viewMode}
             currentBand={openLoopCurrentBand}
+            actualEmissionBand={actualEmissionBand}
+            emissionFrequency={emissionFrequency}
+            interceptedFrequency={openLoopInterceptedFreq}
             metrics={openLoopMetrics}
-            onSelectBand={(bandId) => setOpenLoopCurrentBand(bandId)}
+            isScanning={isScanning}
+            hasDataset={!!loadedDataset}
           />
         </div>
 
-        {/* Bottom Section: Observations Graph/Table & RL Parameters Accordion */}
+        {/* Bottom Section: Observations Graph/Table (Hidden until dataset is uploaded) & RL Parameters Accordion */}
         <div className="flex flex-col gap-6">
-          <ObservationsSection onExportNotify={showToast} />
+          {loadedDataset && <ObservationsSection onExportNotify={showToast} />}
           <RLParametersAccordion />
         </div>
       </main>

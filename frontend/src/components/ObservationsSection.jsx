@@ -1,13 +1,13 @@
 import React, { useState, useRef } from 'react';
 
 const DEFAULT_OBSERVATIONS = [
-  { id: 1, timestamp: "t=528.2s", band: "Band 7", centerFreq: "6.50 GHz", signalType: "Pulsed Radar (X-Band)", duration: "22 μs", status: "Intercepted", confidence: "98.4%" },
-  { id: 2, timestamp: "t=482.0s", band: "Band 9", centerFreq: "8.80 GHz", signalType: "Frequency Agility Chirp", duration: "45 μs", status: "Intercepted", confidence: "94.1%" },
-  { id: 3, timestamp: "t=410.5s", band: "Band 2", centerFreq: "1.80 GHz", signalType: "Tactical Comms Jammer", duration: "110 μs", status: "Intercepted", confidence: "99.2%" },
-  { id: 4, timestamp: "t=312.8s", band: "Band 7", centerFreq: "6.85 GHz", signalType: "Target Tracking Radar", duration: "18 μs", status: "Intercepted", confidence: "96.8%" },
-  { id: 5, timestamp: "t=184.1s", band: "Band 4", centerFreq: "3.40 GHz", signalType: "Phased Array Acquisition", duration: "60 μs", status: "Intercepted", confidence: "91.5%" },
-  { id: 6, timestamp: "t=122.4s", band: "Band 6", centerFreq: "5.45 GHz", signalType: "Fire Control Radar", duration: "30 μs", status: "Intercepted", confidence: "95.2%" },
-  { id: 7, timestamp: "t=88.0s", band: "Band 8", centerFreq: "7.20 GHz", signalType: "Airborne Early Warning", duration: "85 μs", status: "Intercepted", confidence: "97.0%" },
+  { id: 1, timestamp: "t=528.2s", band: "Band 14", centerFreq: "12.31 GHz", signalType: "Pulsed Radar (Ku-Band)", duration: "22 μs", status: "Intercepted", confidence: "98.4%" },
+  { id: 2, timestamp: "t=482.0s", band: "Band 18", centerFreq: "15.81 GHz", signalType: "Frequency Agility Chirp", duration: "45 μs", status: "Intercepted", confidence: "94.1%" },
+  { id: 3, timestamp: "t=410.5s", band: "Band 3", centerFreq: "2.69 GHz", signalType: "Tactical Comms Jammer", duration: "110 μs", status: "Intercepted", confidence: "99.2%" },
+  { id: 4, timestamp: "t=312.8s", band: "Band 13", centerFreq: "11.44 GHz", signalType: "Target Tracking Radar", duration: "18 μs", status: "Intercepted", confidence: "96.8%" },
+  { id: 5, timestamp: "t=184.1s", band: "Band 7", centerFreq: "6.19 GHz", signalType: "Phased Array Acquisition", duration: "60 μs", status: "Intercepted", confidence: "91.5%" },
+  { id: 6, timestamp: "t=122.4s", band: "Band 11", centerFreq: "9.69 GHz", signalType: "Fire Control Radar", duration: "30 μs", status: "Intercepted", confidence: "95.2%" },
+  { id: 7, timestamp: "t=88.0s", band: "Band 16", centerFreq: "14.06 GHz", signalType: "Airborne Early Warning", duration: "85 μs", status: "Intercepted", confidence: "97.0%" },
 ];
 
 export default function ObservationsSection({ onExportNotify }) {
@@ -70,7 +70,7 @@ export default function ObservationsSection({ onExportNotify }) {
   };
 
   return (
-    <div className="bg-white rounded-2xl shadow-[0_2px_8px_rgba(0,0,0,0.03)] border border-slate-200/90 p-5 sm:p-6 flex flex-col">
+    <div className="bg-white rounded-2xl shadow-[0_2px_10px_rgba(0,0,0,0.04)] border border-slate-200 p-5 sm:p-6 flex flex-col">
       {/* Header bar */}
       <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-slate-100">
         <div className="flex flex-col gap-0.5">
@@ -145,7 +145,7 @@ export default function ObservationsSection({ onExportNotify }) {
             )}
           </div>
 
-          {/* Export CSV Button */}
+          {/* Export CSV Button (Available in both Graphical and Tabular views) */}
           <button
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100 text-on-surface font-label-sm text-label-sm hover:bg-slate-200 transition-colors cursor-pointer"
             onClick={handleExportCSV}
@@ -161,14 +161,14 @@ export default function ObservationsSection({ onExportNotify }) {
       {viewMode === 'graph' && (
         <div className="mt-4 flex flex-col" id="observation-graph-display">
           <div className="flex items-start">
-            {/* Y-Axis Labels */}
+            {/* Y-Axis Labels: 500 MHz to 18 GHz */}
             <div className="flex flex-col justify-between h-64 text-right pr-3 font-label-sm text-[11px] text-outline select-none pb-5 shrink-0">
               <span className="font-semibold text-on-surface-variant">Frequency (GHz)</span>
-              <span>20 GHz</span>
-              <span>15 GHz</span>
-              <span>10 GHz</span>
-              <span>5 GHz</span>
-              <span>0 GHz</span>
+              <span>18.0 GHz</span>
+              <span>13.6 GHz</span>
+              <span>9.3 GHz</span>
+              <span>4.9 GHz</span>
+              <span>0.5 GHz</span>
             </div>
 
             {/* Pannable Graph Viewport */}

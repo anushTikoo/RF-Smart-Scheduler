@@ -4,7 +4,7 @@ export default function RLParametersAccordion() {
   const [isExpanded, setIsExpanded] = useState(false);
 
   return (
-    <div className="bg-white rounded-2xl shadow-[0_2px_8px_rgba(0,0,0,0.03)] border border-slate-200/90 overflow-hidden transition-all">
+    <div className="bg-white rounded-2xl shadow-[0_2px_10px_rgba(0,0,0,0.04)] border border-slate-200 overflow-hidden transition-all">
       <button
         className="w-full px-5 sm:px-6 py-4 flex items-center justify-between hover:bg-slate-50/70 transition-colors text-left cursor-pointer"
         onClick={() => setIsExpanded(prev => !prev)}
@@ -17,9 +17,6 @@ export default function RLParametersAccordion() {
           </span>
           <span className="font-label-md text-xs font-semibold text-on-surface uppercase tracking-wider">
             Reinforcement Learning Parameters
-          </span>
-          <span className="px-2 py-0.5 rounded bg-slate-100 text-primary font-semibold text-[10px] font-label-sm">
-            Episode 250
           </span>
         </div>
 
@@ -69,7 +66,7 @@ export default function RLParametersAccordion() {
             </div>
             <div className="flex justify-between py-1 border-b border-slate-100">
               <span className="text-outline">Band Bins:</span>
-              <span className="font-semibold text-on-surface">10 Channels (1 GHz)</span>
+              <span className="font-semibold text-on-surface">20 Channels (875 MHz)</span>
             </div>
           </div>
         </div>
