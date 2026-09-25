@@ -42,6 +42,10 @@ class LinUCBScheduler(Scheduler):
         self.a_inverse: np.ndarray | None = None
         self.b: np.ndarray | None = None
         self.num_updates = 0
+        self.reward_prediction_squared_error_sum = 0.0
+        self.reward_prediction_count = 0
+        self.last_predicted_reward = 0.0
+        self.last_reward_prediction_error = 0.0
         self._num_bands: int | None = None
         self._context_size: int | None = None
 
@@ -134,6 +138,12 @@ class LinUCBScheduler(Scheduler):
         context = self.last_contexts[action]
         model_index = 0 if self.shared_model else action
         inverse = self.a_inverse[model_index]
+        predicted_reward = float((inverse @ self.b[model_index]) @ context)
+        prediction_error = float(transition.reward - predicted_reward)
+        self.last_predicted_reward = predicted_reward
+        self.last_reward_prediction_error = prediction_error
+        self.reward_prediction_squared_error_sum += prediction_error**2
+        self.reward_prediction_count += 1
         projected = inverse @ context
         denominator = 1.0 + float(context @ projected)
         self.a_inverse[model_index] = (
@@ -161,6 +171,10 @@ class LinUCBScheduler(Scheduler):
             "coverage_bonus_weight": self.coverage_bonus_weight,
             "shared_model": self.shared_model,
             "num_updates": self.num_updates,
+            "reward_prediction_squared_error_sum": (
+                self.reward_prediction_squared_error_sum
+            ),
+            "reward_prediction_count": self.reward_prediction_count,
             "num_bands": self._num_bands,
             "context_size": self._context_size,
         }
@@ -198,9 +212,23 @@ class LinUCBScheduler(Scheduler):
             scheduler.a_inverse = payload["a_inverse"].astype(np.float64, copy=True)
             scheduler.b = payload["b"].astype(np.float64, copy=True)
             scheduler.num_updates = int(metadata.get("num_updates", 0))
+            scheduler.reward_prediction_squared_error_sum = float(
+                metadata.get("reward_prediction_squared_error_sum", 0.0)
+            )
+            scheduler.reward_prediction_count = int(
+                metadata.get("reward_prediction_count", 0)
+            )
             scheduler._num_bands = int(metadata["num_bands"])
             scheduler._context_size = int(metadata["context_size"])
         scheduler._validate_model_shape(
             int(metadata["num_bands"]), int(metadata["context_size"])
         )
         return scheduler
+
+    @property
+    def reward_prediction_mse(self) -> float:
+        """Mean squared error between predicted and observed contextual reward."""
+
+        return self.reward_prediction_squared_error_sum / max(
+            self.reward_prediction_count, 1
+        )

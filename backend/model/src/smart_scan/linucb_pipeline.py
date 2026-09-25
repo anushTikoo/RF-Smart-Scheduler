@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from copy import deepcopy
 from dataclasses import asdict
+import csv
 import json
 from pathlib import Path
 import shutil
@@ -98,6 +99,8 @@ def train_linucb(
                 )
             episode = Episode.load(path)
             run_seed = seed + epoch * len(paths) + index
+            error_sum_before = scheduler.reward_prediction_squared_error_sum
+            prediction_count_before = scheduler.reward_prediction_count
             row = run_episode(
                 episode,
                 scheduler,
@@ -107,9 +110,59 @@ def train_linucb(
             )
             row["epoch"] = epoch
             row["episode"] = str(path)
+            prediction_count = (
+                scheduler.reward_prediction_count - prediction_count_before
+            )
+            squared_error = (
+                scheduler.reward_prediction_squared_error_sum - error_sum_before
+            )
+            row["reward_prediction_mse"] = squared_error / max(prediction_count, 1)
+            recent = training_rows[-4:] + [row]
+            row["rolling_5_average_reward"] = sum(
+                float(item["average_reward"]) for item in recent
+            ) / len(recent)
+            row["rolling_5_reward_prediction_mse"] = sum(
+                float(item["reward_prediction_mse"]) for item in recent
+            ) / len(recent)
+            row["cumulative_updates"] = scheduler.num_updates
             training_rows.append(row)
+            if progress is not None:
+                progress(
+                    f"completed {path.name}: average_reward={float(row['average_reward']):.6f}, "
+                    f"reward_prediction_mse={float(row['reward_prediction_mse']):.6f}, "
+                    f"rolling_5_reward={float(row['rolling_5_average_reward']):.6f}, "
+                    f"rolling_5_mse={float(row['rolling_5_reward_prediction_mse']):.6f}"
+                )
 
     checkpoint = scheduler.save(output_path)
+    history_json_path = checkpoint.with_name(
+        f"{checkpoint.stem}_training_history.json"
+    )
+    history_csv_path = checkpoint.with_name(
+        f"{checkpoint.stem}_training_history.csv"
+    )
+    history_json_path.write_text(
+        json.dumps(training_rows, indent=2), encoding="utf-8"
+    )
+    history_fields = [
+        "epoch",
+        "episode",
+        "average_reward",
+        "reward_prediction_mse",
+        "rolling_5_average_reward",
+        "rolling_5_reward_prediction_mse",
+        "cumulative_updates",
+        "pulse_interception_ratio",
+        "emitter_event_interception_ratio",
+        "unique_emitter_coverage",
+        "average_first_intercept_delay_s",
+        "miss_rate",
+    ]
+    with history_csv_path.open("w", newline="", encoding="utf-8") as stream:
+        writer = csv.DictWriter(stream, fieldnames=history_fields)
+        writer.writeheader()
+        for row in training_rows:
+            writer.writerow({field: row[field] for field in history_fields})
     metadata = {
         "checkpoint": str(checkpoint),
         "episode_paths": [str(path) for path in paths],
@@ -120,6 +173,9 @@ def train_linucb(
         "linucb_options": linucb_options,
         "num_updates": scheduler.num_updates,
         "training_runs": len(training_rows),
+        "training_history_json": str(history_json_path),
+        "training_history_csv": str(history_csv_path),
+        "final_reward_prediction_mse": scheduler.reward_prediction_mse,
         "final_training_run": training_rows[-1],
     }
     checkpoint.with_suffix(".json").write_text(
@@ -138,6 +194,7 @@ def evaluate_frozen_linucb(
     seed: int = 42,
     bootstrap_samples: int = 2000,
     progress: Callable[[str], None] | None = None,
+    band_log_interval: int = 0,
 ) -> dict[str, object]:
     """Evaluate a frozen checkpoint and round-robin on independent scenarios."""
 
@@ -153,6 +210,27 @@ def evaluate_frozen_linucb(
             progress(f"evaluating scenario {index + 1}/{len(paths)}: {path.name}")
         episode = Episode.load(path)
         run_seed = seed + index
+
+        def log_linucb_action(
+            record: dict[str, float | int | str | bool],
+            *,
+            scenario: str = path.name,
+        ) -> None:
+            if (
+                progress is not None
+                and band_log_interval > 0
+                and int(record["step"]) % band_log_interval == 0
+            ):
+                progress(
+                    f"inference {scenario}: step={record['step']}, "
+                    f"time={float(record['time_start_s']):.6f}s, "
+                    f"band={record['band_index']}, "
+                    f"range={float(record['frequency_low_mhz']):.1f}-"
+                    f"{float(record['frequency_high_mhz']):.1f}MHz, "
+                    f"pulses={record['detected_pulses']}, "
+                    f"reward={float(record['reward']):.6f}"
+                )
+
         rows = [
             run_episode(
                 episode,
@@ -160,6 +238,9 @@ def evaluate_frozen_linucb(
                 seed=run_seed,
                 receiver=receiver,
                 reward=reward,
+                trace_path=(
+                    output / "traces" / f"{path.stem}_round_robin.csv"
+                ),
             ),
             run_episode(
                 episode,
@@ -167,8 +248,16 @@ def evaluate_frozen_linucb(
                 seed=run_seed,
                 receiver=receiver,
                 reward=reward,
+                trace_path=output / "traces" / f"{path.stem}_linucb.csv",
+                action_callback=(
+                    log_linucb_action if band_log_interval > 0 else None
+                ),
             ),
         ]
+        if progress is not None:
+            progress(
+                f"wrote band traces for {path.name} under {output / 'traces'}"
+            )
         result_path = output / "episodes" / f"{path.stem}.json"
         save_results(rows, result_path)
         result_paths.append(result_path)
@@ -267,6 +356,21 @@ def train_validate_select(
     shutil.copy2(best["checkpoint"], frozen_checkpoint)
     source_metadata = Path(best["checkpoint"]).with_suffix(".json")
     shutil.copy2(source_metadata, frozen_checkpoint.with_suffix(".json"))
+    selected_checkpoint = Path(best["checkpoint"])
+    frozen_history_json = output / "frozen_training_history.json"
+    frozen_history_csv = output / "frozen_training_history.csv"
+    shutil.copy2(
+        selected_checkpoint.with_name(
+            f"{selected_checkpoint.stem}_training_history.json"
+        ),
+        frozen_history_json,
+    )
+    shutil.copy2(
+        selected_checkpoint.with_name(
+            f"{selected_checkpoint.stem}_training_history.csv"
+        ),
+        frozen_history_csv,
+    )
 
     frozen_configuration = deepcopy(configuration)
     frozen_configuration["linucb"] = dict(best["options"])
@@ -289,6 +393,8 @@ def train_validate_select(
         "selected": best,
         "frozen_checkpoint": str(frozen_checkpoint),
         "frozen_config": str(frozen_config_path),
+        "frozen_training_history_json": str(frozen_history_json),
+        "frozen_training_history_csv": str(frozen_history_csv),
         "test_data_accessed": False,
     }
     (output / "selection.json").write_text(

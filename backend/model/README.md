@@ -124,6 +124,10 @@ The compact candidate search is declared in `configs/linucb_search.yaml`. Select
 - `outputs/linucb_pipeline/frozen_linucb.npz`
 - `outputs/linucb_pipeline/frozen_config.yaml`
 - `outputs/linucb_pipeline/selection.json`
+- `outputs/linucb_pipeline/frozen_training_history.csv`
+- `outputs/linucb_pipeline/frozen_training_history.json`
+
+During training, the terminal reports each scenario's average reward, contextual reward-prediction MSE, and five-scenario rolling values. LinUCB is a closed-form contextual bandit rather than a neural network, so reward-prediction MSE is the relevant loss-like diagnostic. Scenario rewards need not increase monotonically because each file contains a different RF environment; use the rolling series and validation results to judge learning.
 
 Only after those files are frozen, download and preprocess the new sealed test scenarios 17–26:
 
@@ -140,6 +144,8 @@ smart-scan preprocess `
 ```
 
 The final-test command loads the frozen checkpoint with online updates disabled and compares only round-robin and LinUCB. See `LINUCB_TRAINING_PIPELINE.md` for the data-boundary and checkpoint details.
+
+Every inference decision is written to CSV under `outputs/linucb_pipeline/final_test/traces`. Each row contains time, selected band, exact frequency range, detected pulse count, miss/false-alarm flags, reward components, and switching distance. The final-test command also prints the selected LinUCB band every 100 decisions by default; change this with `--band-log-interval`.
 
 Generate the named interception figures of merit from an aggregate result:
 

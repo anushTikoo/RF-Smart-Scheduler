@@ -36,6 +36,12 @@ def main() -> int:
     )
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--bootstrap-samples", type=int, default=10_000)
+    parser.add_argument(
+        "--band-log-interval",
+        type=int,
+        default=100,
+        help="print the selected LinUCB band every N decisions; use 0 to disable",
+    )
     args = parser.parse_args()
 
     configuration = load_config(args.config)
@@ -49,6 +55,7 @@ def main() -> int:
         seed=args.seed,
         bootstrap_samples=args.bootstrap_samples,
         progress=lambda message: print(message, flush=True),
+        band_log_interval=args.band_log_interval,
     )
     protocol = {
         "checkpoint": str(args.checkpoint),

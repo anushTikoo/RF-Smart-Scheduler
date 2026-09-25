@@ -44,6 +44,35 @@ The selected shared LinUCB model saves:
 
 Calling `reset()` for a new training episode clears episode-local action context while retaining these learned statistics. A frozen checkpoint can be loaded without enabling online updates.
 
+## Training diagnostics
+
+LinUCB updates its linear sufficient statistics analytically and therefore has no neural-network optimization loss. The implementation logs contextual reward-prediction mean squared error as the loss-like diagnostic:
+
+```text
+reward_prediction_mse = mean((observed_reward - predicted_reward)^2)
+```
+
+For every training scenario it records average reward, prediction MSE, five-scenario rolling reward/MSE, cumulative updates, interception ratios, coverage, delay, and miss rate. The selected candidate's complete history is copied to:
+
+```text
+outputs/linucb_pipeline/frozen_training_history.csv
+outputs/linucb_pipeline/frozen_training_history.json
+```
+
+Because scenarios contain different emitters and activity densities, raw per-scenario reward is not expected to increase monotonically. Rolling metrics and frozen validation performance are the meaningful trend checks.
+
+## Inference band trace
+
+Frozen validation and test runs write one CSV row for every receiver decision under their `traces` directories. Rows include step/time, band index, lower and upper frequency, pulse interceptions, miss and false-alarm flags, total reward and each reward component, and switching distance.
+
+The final-test script prints the active LinUCB band every 100 decisions by default:
+
+```powershell
+.venv\Scripts\python scripts/linucb_final_test.py --band-log-interval 100
+```
+
+Use `--band-log-interval 1` for every decision or `0` to disable console band logging. Full CSV traces are produced independently of the console interval.
+
 ## Hyperparameter selection
 
 `configs/linucb_search.yaml` declares an explicit compact search over:

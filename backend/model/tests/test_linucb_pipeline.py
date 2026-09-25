@@ -20,6 +20,8 @@ def test_linucb_checkpoint_round_trip_and_frozen_inference(tmp_path) -> None:
     )
     run_episode(episode, scheduler, seed=1)
     assert scheduler.num_updates == episode.num_steps
+    assert scheduler.reward_prediction_count == episode.num_steps
+    assert scheduler.reward_prediction_mse >= 0.0
     learned_b = scheduler.b.copy()
 
     # Starting another episode clears only episode-local context, not learning.
@@ -87,4 +89,14 @@ def test_train_validate_selection_produces_frozen_artifacts(tmp_path) -> None:
     assert selection["test_data_accessed"] is False
     assert (output / "frozen_linucb.npz").is_file()
     assert (output / "frozen_config.yaml").is_file()
+    assert (output / "frozen_training_history.csv").is_file()
+    assert (output / "frozen_training_history.json").is_file()
     assert (output / "selection.json").is_file()
+    assert (
+        output
+        / "candidates"
+        / "candidate_a"
+        / "validation"
+        / "traces"
+        / "validation_linucb.csv"
+    ).is_file()

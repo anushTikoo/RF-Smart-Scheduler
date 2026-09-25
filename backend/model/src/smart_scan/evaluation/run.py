@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import csv
 import json
 from pathlib import Path
 from typing import Callable
@@ -76,16 +77,48 @@ def run_episode(
     seed: int = 0,
     receiver: ReceiverConfig | None = None,
     reward: RewardConfig | None = None,
+    trace_path: str | Path | None = None,
+    action_callback: Callable[[dict[str, float | int | str | bool]], None]
+    | None = None,
 ) -> dict[str, float | str | int]:
     env = ScanEnvironment(episode, receiver=receiver, reward=reward, seed=seed)
     scheduler.reset(env, seed=seed)
     state = env.reset()
+    trace_rows: list[dict[str, float | int | str | bool]] = []
     while not env.done:
+        step = env.step_index
         action = scheduler.select_action(env)
         transition = env.step(action)
+        action_record = {
+            "scheduler": scheduler.name,
+            "step": step,
+            "time_start_s": step * episode.time_bin_s,
+            "band_index": action,
+            "frequency_low_mhz": float(episode.band_edges_mhz[action]),
+            "frequency_high_mhz": float(episode.band_edges_mhz[action + 1]),
+            "detected_pulses": transition.detected_pulses,
+            "miss": transition.miss,
+            "false_alarm": transition.false_alarm,
+            "reward": transition.reward,
+            "interception_reward": transition.interception_reward,
+            "acquisition_delay_penalty": transition.acquisition_delay_penalty,
+            "miss_penalty": transition.miss_penalty,
+            "switching_distance": transition.switching_distance,
+        }
+        if trace_path is not None:
+            trace_rows.append(action_record)
+        if action_callback is not None:
+            action_callback(action_record)
         next_state = env.state_vector()
         scheduler.observe(env, state, action, transition, next_state)
         state = next_state
+    if trace_path is not None:
+        target = Path(trace_path)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        with target.open("w", newline="", encoding="utf-8") as stream:
+            writer = csv.DictWriter(stream, fieldnames=list(trace_rows[0]))
+            writer.writeheader()
+            writer.writerows(trace_rows)
     return {"scheduler": scheduler.name, "seed": seed, **env.summary()}
 
 
