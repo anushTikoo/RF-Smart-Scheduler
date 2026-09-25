@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=75", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "smart-scan-ew"
+version = "0.1.0"
+description = "Model-only smart frequency scan scheduling research prototype"
+requires-python = ">=3.11"
+dependencies = [
+  "h5py>=3.12",
+  "huggingface-hub>=0.27",
+  "numpy>=2.0",
+  "PyYAML>=6.0",
+]
+
+[project.optional-dependencies]
+ml = ["torch>=2.6"]
+dev = ["pytest>=8.3", "pytest-cov>=6.0"]
+
+[project.scripts]
+smart-scan = "smart_scan.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+

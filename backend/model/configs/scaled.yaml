@@ -1,0 +1,41 @@
+seed: 42
+receiver:
+  frequency_min_mhz: 500.0
+  frequency_max_mhz: 18000.0
+  bandwidth_mhz: 500.0
+  dwell_ms: 5.0
+  amplitude_threshold_db: -120.0
+  detection_probability: 1.0
+  false_alarm_probability: 0.0
+  decision_latency_us: 0.0
+  retune_time_us: 0.0
+  settling_time_us: 0.0
+reward:
+  # R = 0.01 * intercepted pulses - 1.0 * pending-emitter seconds - 0.1 * miss
+  pulse_intercept_weight: 0.01
+  acquisition_delay_weight_per_s: 1.0
+  miss_penalty: 0.1
+history:
+  ewma_alpha: 0.2
+linucb:
+  alpha: 1.0
+  regularization: 1.0
+  min_revisit_factor: 0.5
+  max_revisit_factor: 3.0
+  uncertainty_weight: 0.75
+  coverage_bonus_weight: 1.0
+dqn:
+  hidden_size: 128
+  replay_capacity: 200000
+  batch_size: 64
+  gamma: 0.95
+  learning_rate: 0.0005
+  target_update_steps: 500
+  train_frequency: 4
+  epsilon_start: 1.0
+  epsilon_end: 0.05
+  epsilon_decay_steps: 50000
+  min_revisit_factor: 0.5
+  max_revisit_factor: 3.0
+  uncertainty_weight: 0.75
+  coverage_bonus_weight: 0.5

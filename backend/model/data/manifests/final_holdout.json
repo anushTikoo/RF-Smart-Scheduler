@@ -1,0 +1,11 @@
+{
+  "dataset_id": "alan-turing-institute/turing-synthetic-radar-dataset",
+  "description": "Untouched final holdout scenarios selected before final model evaluation.",
+  "files": [
+    {"split": "test", "mode": "stare", "config_id": 2},
+    {"split": "test", "mode": "stare", "config_id": 3},
+    {"split": "test", "mode": "stare", "config_id": 4},
+    {"split": "test", "mode": "stare", "config_id": 5},
+    {"split": "test", "mode": "stare", "config_id": 6}
+  ]
+}

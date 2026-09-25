@@ -1,0 +1,206 @@
+{
+  "dataset_id": "alan-turing-institute/turing-synthetic-radar-dataset",
+  "description": "Frozen scaled development split: 30 official training scenarios and 10 official validation scenarios. Whole files only.",
+  "files": [
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 0
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 1
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 2
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 3
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 4
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 5
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 6
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 7
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 8
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 9
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 10
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 11
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 12
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 13
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 14
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 15
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 16
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 17
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 18
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 19
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 20
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 21
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 22
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 23
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 24
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 25
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 26
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 27
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 28
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 29
+    },
+    {
+      "split": "val",
+      "mode": "stare",
+      "config_id": 0
+    },
+    {
+      "split": "val",
+      "mode": "stare",
+      "config_id": 1
+    },
+    {
+      "split": "val",
+      "mode": "stare",
+      "config_id": 2
+    },
+    {
+      "split": "val",
+      "mode": "stare",
+      "config_id": 3
+    },
+    {
+      "split": "val",
+      "mode": "stare",
+      "config_id": 4
+    },
+    {
+      "split": "val",
+      "mode": "stare",
+      "config_id": 5
+    },
+    {
+      "split": "val",
+      "mode": "stare",
+      "config_id": 6
+    },
+    {
+      "split": "val",
+      "mode": "stare",
+      "config_id": 7
+    },
+    {
+      "split": "val",
+      "mode": "stare",
+      "config_id": 8
+    },
+    {
+      "split": "val",
+      "mode": "stare",
+      "config_id": 9
+    }
+  ]
+}

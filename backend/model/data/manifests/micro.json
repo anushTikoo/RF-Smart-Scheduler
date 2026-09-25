@@ -1,0 +1,19 @@
+{
+  "dataset_id": "alan-turing-institute/turing-synthetic-radar-dataset",
+  "description": "Initial 12-file stare-mode micro-dataset. File IDs are deterministic and may be revised after metadata stratification.",
+  "files": [
+    {"split": "train", "mode": "stare", "config_id": 0},
+    {"split": "train", "mode": "stare", "config_id": 1},
+    {"split": "train", "mode": "stare", "config_id": 2},
+    {"split": "train", "mode": "stare", "config_id": 3},
+    {"split": "train", "mode": "stare", "config_id": 4},
+    {"split": "train", "mode": "stare", "config_id": 5},
+    {"split": "train", "mode": "stare", "config_id": 6},
+    {"split": "train", "mode": "stare", "config_id": 7},
+    {"split": "val", "mode": "stare", "config_id": 0},
+    {"split": "val", "mode": "stare", "config_id": 1},
+    {"split": "test", "mode": "stare", "config_id": 0},
+    {"split": "test", "mode": "stare", "config_id": 1}
+  ]
+}
+

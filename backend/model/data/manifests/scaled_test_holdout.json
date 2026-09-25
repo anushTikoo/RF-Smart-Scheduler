@@ -1,0 +1,56 @@
+{
+  "dataset_id": "alan-turing-institute/turing-synthetic-radar-dataset",
+  "description": "Sealed untouched scaled holdout: 10 official test scenarios. Test IDs 0-6 were consumed by earlier experiments and are deliberately excluded.",
+  "files": [
+    {
+      "split": "test",
+      "mode": "stare",
+      "config_id": 7
+    },
+    {
+      "split": "test",
+      "mode": "stare",
+      "config_id": 8
+    },
+    {
+      "split": "test",
+      "mode": "stare",
+      "config_id": 9
+    },
+    {
+      "split": "test",
+      "mode": "stare",
+      "config_id": 10
+    },
+    {
+      "split": "test",
+      "mode": "stare",
+      "config_id": 11
+    },
+    {
+      "split": "test",
+      "mode": "stare",
+      "config_id": 12
+    },
+    {
+      "split": "test",
+      "mode": "stare",
+      "config_id": 13
+    },
+    {
+      "split": "test",
+      "mode": "stare",
+      "config_id": 14
+    },
+    {
+      "split": "test",
+      "mode": "stare",
+      "config_id": 15
+    },
+    {
+      "split": "test",
+      "mode": "stare",
+      "config_id": 16
+    }
+  ]
+}
