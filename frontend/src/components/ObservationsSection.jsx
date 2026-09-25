@@ -1,5 +1,35 @@
 import React, { useState, useRef, useEffect } from 'react';
 
+// Discrete Stepped Band vs. Time Graph Icon with orthogonal horizontal dwell lines & vertical transitions
+function BandStepGraphIcon({ className = "w-[20px] h-[20px] text-primary" }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      className={`shrink-0 select-none ${className}`}
+    >
+      {/* Coordinate axes for Band (Y) vs Time (X) */}
+      <path
+        d="M 3 3.5 V 20.5 H 21"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        opacity="0.38"
+      />
+      {/* Stepped binary scan trajectory: strictly horizontal band dwells & vertical band switches */}
+      <path
+        d="M 3.5 16 H 8 V 7 H 14 V 13.5 H 18 V 5.5 H 21.5"
+        stroke="currentColor"
+        strokeWidth="2.2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 export default function ObservationsSection({
   observations = [],
   isScanning = false,
@@ -17,21 +47,23 @@ export default function ObservationsSection({
   const startXRef = useRef(0);
   const scrollLeftRef = useRef(0);
 
+  const [hoverInfo, setHoverInfo] = useState(null);
+
   // Fallback to 'all' if user switched to receiver view while 'emissions' was selected
   const effectiveFilter = (viewMode === 'receiver' && filter === 'emissions') ? 'all' : filter;
 
   // Filter options based on whether we are in Receiver View or Environmental View
   const filterOptions = viewMode === 'environment'
     ? [
-        { id: 'all', label: 'All', desc: 'Hits, Misses & Emissions' },
-        { id: 'interceptions', label: 'Interceptions Only', desc: 'Detected hits only' },
-        { id: 'misses', label: 'Misses Only', desc: 'Searching misses only' },
+        { id: 'all', label: 'All Dwells', desc: 'Hits, Scan Misses & Emissions' },
+        { id: 'interceptions', label: 'Hits Only', desc: 'Detected hits only' },
+        { id: 'misses', label: 'Scan Misses Only', desc: 'Missed opportunities' },
         { id: 'emissions', label: 'Actual Emissions Only', desc: 'Target emissions only' },
       ]
     : [
-        { id: 'all', label: 'Both (Hits & Misses)', desc: 'Full receiver scan timeline' },
-        { id: 'interceptions', label: 'Interceptions Only', desc: 'Detected hits only' },
-        { id: 'misses', label: 'Misses Only', desc: 'Searching misses only' },
+        { id: 'all', label: 'All Dwells', desc: 'Full receiver scan timeline' },
+        { id: 'interceptions', label: 'Hits Only', desc: 'Detected hits only' },
+        { id: 'misses', label: 'Scan Misses Only', desc: 'Missed opportunities' },
       ];
 
   const currentFilterMeta = filterOptions.find((f) => f.id === effectiveFilter) || filterOptions[0];
@@ -47,6 +79,7 @@ export default function ObservationsSection({
   const handleMouseDown = (e) => {
     if (!sliderRef.current) return;
     isDownRef.current = true;
+    setHoverInfo(null);
     startXRef.current = e.pageX - sliderRef.current.offsetLeft;
     scrollLeftRef.current = sliderRef.current.scrollLeft;
   };
@@ -56,11 +89,12 @@ export default function ObservationsSection({
   };
 
   const handleMouseMove = (e) => {
-    if (!isDownRef.current || !sliderRef.current) return;
-    e.preventDefault();
-    const x = e.pageX - sliderRef.current.offsetLeft;
-    const walk = (x - startXRef.current) * 1.5;
-    sliderRef.current.scrollLeft = scrollLeftRef.current - walk;
+    if (isDownRef.current && sliderRef.current) {
+      e.preventDefault();
+      const x = e.pageX - sliderRef.current.offsetLeft;
+      const walk = (x - startXRef.current) * 1.5;
+      sliderRef.current.scrollLeft = scrollLeftRef.current - walk;
+    }
   };
 
   // Filter rows for the tabular view and CSV export
@@ -81,29 +115,35 @@ export default function ObservationsSection({
 
     const isEnv = viewMode === 'environment';
     const headers = isEnv
-      ? ["Time (µs)", "Scheduled Band", "Intercepted Frequency", "Actual Emission(s)", "Frequency Range", "Rx Status"]
-      : ["Time (µs)", "Scheduled Band", "Intercepted Frequency", "Frequency Range", "Rx Status"];
+      ? ["Time Window", "Selected Band", "Intercepted Frequency", "Result", "Pulses Detected", "Active Emissions in Window", "Frequency Range"]
+      : ["Time Window", "Selected Band", "Intercepted Frequency", "Result", "Pulses Detected", "Frequency Range"];
 
     const rows = filteredObservations.map((obs) => {
+      const resultText = obs.result || (obs.isIntercepted ? 'HIT' : 'SCAN MISS');
+      const pulses = obs.pulsesDetected !== undefined ? obs.pulsesDetected : (obs.isIntercepted ? 3 : 0);
+      const exactIntercepted = obs.isIntercepted ? (obs.interceptedFreq && obs.interceptedFreq !== '-' ? obs.interceptedFreq : obs.centerFreq) : '-';
+
       const emissionStr = obs.actualEmissions && obs.actualEmissions.length > 0
-        ? obs.actualEmissions.map((e) => `Band ${e.bandId} (${e.freqStr})`).join(' • ')
+        ? obs.actualEmissions.map((e) => `Band ${e.bandId} (${e.freqStr}) [${e.isDetected ? 'Detected' : 'Missed'}]`).join(' • ')
         : (obs.actualFreqStr || '-');
 
       return isEnv
         ? [
-            `"${obs.timestamp || obs.timeUs + ' µs'}"`,
+            `"${obs.timeWindow || obs.timestamp}"`,
             `"${obs.band}"`,
-            `"${obs.interceptedFreq || (obs.isIntercepted ? obs.centerFreq : '-')}"`,
+            `"${exactIntercepted}"`,
+            `"${resultText}"`,
+            `"${pulses}"`,
             `"${emissionStr}"`,
             `"${obs.range}"`,
-            `"${obs.status}"`,
           ]
         : [
-            `"${obs.timestamp || obs.timeUs + ' µs'}"`,
+            `"${obs.timeWindow || obs.timestamp}"`,
             `"${obs.band}"`,
-            `"${obs.interceptedFreq || (obs.isIntercepted ? obs.centerFreq : '-')}"`,
+            `"${exactIntercepted}"`,
+            `"${resultText}"`,
+            `"${pulses}"`,
             `"${obs.range}"`,
-            `"${obs.status}"`,
           ];
     });
 
@@ -125,17 +165,17 @@ export default function ObservationsSection({
   };
 
   // Coordinate mapping for SVG Graph:
-  // 0.50 GHz (bottom) maps to Y=205, 18.00 GHz (top) maps to Y=25. Usable height = 180px.
+  // Band 1 (bottom) maps to Y=205, Band 20 (top) maps to Y=25. Usable height = 180px.
   const slotWidth = 56;
   const paddingLeft = 24;
   const paddingRight = 50;
   const plotWidth = Math.max(680, paddingLeft + observations.length * slotWidth + paddingRight);
   const plotHeight = 230;
 
-  // Exact mathematical mapping: clamped between 0.5 and 18.0 GHz
-  const getY = (freqGhz) => {
-    const clamped = Math.min(18.0, Math.max(0.5, freqGhz || 0.5));
-    return 205 - ((clamped - 0.5) / 17.5) * 180;
+  // Exact mathematical mapping: Band 1 to Band 20
+  const getY = (band) => {
+    const b = Math.min(20, Math.max(1, Number(band) || 1));
+    return 205 - ((b - 1) / 19) * 180;
   };
 
   // Prepare geometry for each observation step
@@ -144,12 +184,13 @@ export default function ObservationsSection({
     const startX = paddingLeft + i * slotWidth;
     const endX = startX + slotWidth;
     const midX = (startX + endX) / 2;
-    const y = getY(obs.freqGhz);
+    const bandNum = obs.bandId || (obs.band ? parseInt(obs.band.replace(/\D/g, ''), 10) : 1);
+    const y = getY(bandNum);
 
     // Calculate Y for all actual emissions (single or simultaneous multi-emitter)
     const emissions = (obs.actualEmissions || []).map((em) => ({
       ...em,
-      y: getY(em.freqGhz),
+      y: getY(em.bandId || (em.band ? parseInt(em.band.replace(/\D/g, ''), 10) : 1)),
     }));
 
     return {
@@ -194,11 +235,9 @@ export default function ObservationsSection({
       <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-slate-100">
         <div className="flex flex-col gap-0.5">
           <div className="flex items-center gap-2">
-            <span className="material-symbols-outlined text-[20px] text-primary select-none">
-              timeline
-            </span>
+            <BandStepGraphIcon className="w-[20px] h-[20px] text-primary" />
             <h3 className="font-label-md text-label-md font-semibold text-on-surface uppercase tracking-wide">
-              Frequency vs. Time Observations
+              Band vs. Time Observations
             </h3>
           </div>
           <p className="font-body-sm text-[11px] text-slate-500 font-normal pl-7">
@@ -344,28 +383,21 @@ export default function ObservationsSection({
                   textAnchor="end"
                   className="text-[9px] font-sans font-bold fill-slate-600 uppercase tracking-wide"
                 >
-                  Freq (GHz)
+                  Band
                 </text>
-                {/* Y-Axis Grid Tick Values (Aligned to grid lines at 25, 61, 97, 133, 169, 205) */}
-                {[
-                  { ghz: 18.0, y: 25 },
-                  { ghz: 14.5, y: 61 },
-                  { ghz: 11.0, y: 97 },
-                  { ghz: 7.5, y: 133 },
-                  { ghz: 4.0, y: 169 },
-                  { ghz: 0.5, y: 205 },
-                ].map((tick) => (
-                  <g key={`y-tick-${tick.ghz}`}>
+                {/* Y-Axis Grid Tick Values (Band 20 down to Band 1) */}
+                {[20, 16, 12, 8, 4, 1].map((b) => (
+                  <g key={`y-tick-${b}`}>
                     <text
                       x="56"
-                      y={tick.y}
+                      y={getY(b)}
                       dominantBaseline="central"
                       textAnchor="end"
                       className="text-[10px] font-mono fill-slate-500 font-medium"
                     >
-                      {tick.ghz.toFixed(1)}
+                      {`Band ${b}`}
                     </text>
-                    <line x1="61" y1={tick.y} x2="68" y2={tick.y} stroke="#CBD5E1" strokeWidth="1" />
+                    <line x1="61" y1={getY(b)} x2="68" y2={getY(b)} stroke="#CBD5E1" strokeWidth="1" />
                   </g>
                 ))}
               </svg>
@@ -385,23 +417,40 @@ export default function ObservationsSection({
                 style={{ width: `${plotWidth}px`, height: `${plotHeight}px` }}
                 className="overflow-visible block"
               >
-                {/* Horizontal Gridlines spanning plot width */}
-                <line x1="0" y1="25" x2={plotWidth} y2="25" stroke="#F1F5F9" strokeDasharray="3 3" strokeWidth="1" />
-                <line x1="0" y1="61" x2={plotWidth} y2="61" stroke="#F1F5F9" strokeDasharray="3 3" strokeWidth="1" />
-                <line x1="0" y1="97" x2={plotWidth} y2="97" stroke="#F1F5F9" strokeDasharray="3 3" strokeWidth="1" />
-                <line x1="0" y1="133" x2={plotWidth} y2="133" stroke="#F1F5F9" strokeDasharray="3 3" strokeWidth="1" />
-                <line x1="0" y1="169" x2={plotWidth} y2="169" stroke="#F1F5F9" strokeDasharray="3 3" strokeWidth="1" />
-                <line x1="0" y1="205" x2={plotWidth} y2="205" stroke="#E2E8F0" strokeWidth="1.5" />
+                {/* Horizontal Gridlines for Spectrum Bands */}
+                {[20, 16, 12, 8, 4, 1].map((b) => (
+                  <line
+                    key={`h-grid-${b}`}
+                    x1="0"
+                    y1={getY(b)}
+                    x2={plotWidth}
+                    y2={getY(b)}
+                    stroke={b === 1 ? "#E2E8F0" : "#F1F5F9"}
+                    strokeDasharray={b === 1 ? "none" : "3 3"}
+                    strokeWidth={b === 1 ? 1.5 : 1}
+                  />
+                ))}
 
-                {/* Vertical Time Step Gridlines */}
+                {/* Vertical Time Step Boundary Gridlines */}
+                {pts.length > 0 && (
+                  <line
+                    x1={pts[0].startX}
+                    y1="20"
+                    x2={pts[0].startX}
+                    y2="205"
+                    stroke="#F1F5F9"
+                    strokeDasharray="2 3"
+                    strokeWidth="1"
+                  />
+                )}
                 {pts.map((pt) => (
                   <line
                     key={`v-grid-${pt.obs.id}`}
-                    x1={pt.midX}
+                    x1={pt.endX}
                     y1="20"
-                    x2={pt.midX}
+                    x2={pt.endX}
                     y2="205"
-                    stroke="#F8FAFC"
+                    stroke="#F1F5F9"
                     strokeDasharray="2 3"
                     strokeWidth="1"
                   />
@@ -430,49 +479,131 @@ export default function ObservationsSection({
                   if (!isHit && !showMisses) return null;
 
                   const strokeColor = isHit ? '#10B981' : '#F59E0B';
+                  const freqText = pt.obs.interceptedFreq && pt.obs.interceptedFreq !== '-' ? pt.obs.interceptedFreq : pt.obs.centerFreq;
 
                   return (
                     <g key={`dwell-group-${pt.obs.id}`}>
-                      {/* Full-width horizontal receiver dwell line */}
-                      <line
-                        x1={pt.startX}
-                        y1={pt.y}
-                        x2={pt.endX}
-                        y2={pt.y}
-                        stroke={strokeColor}
-                        strokeWidth="3.2"
-                        strokeLinecap="round"
-                      />
-                      <title>{`${pt.obs.timestamp} • Receiver Scan: ${pt.obs.band} (${pt.obs.centerFreq}) • Rx: ${pt.obs.status}${isHit ? ' (CAUGHT TARGET)' : ''}`}</title>
+                      {isHit ? (
+                        <g
+                          style={{ cursor: 'pointer' }}
+                          className="cursor-pointer"
+                          onMouseEnter={(e) => {
+                            const rect = sliderRef.current?.getBoundingClientRect();
+                            const mouseX = e.clientX - (rect?.left || 0) + (sliderRef.current?.scrollLeft || 0);
+                            setHoverInfo({
+                              freq: freqText,
+                              x: mouseX,
+                              y: pt.y,
+                            });
+                          }}
+                          onMouseMove={(e) => {
+                            const rect = sliderRef.current?.getBoundingClientRect();
+                            const mouseX = e.clientX - (rect?.left || 0) + (sliderRef.current?.scrollLeft || 0);
+                            setHoverInfo({
+                              freq: freqText,
+                              x: mouseX,
+                              y: pt.y,
+                            });
+                          }}
+                          onMouseLeave={() => setHoverInfo(null)}
+                        >
+                          {/* Invisible wider hit area for easy hover targeting on horizontal line */}
+                          <line
+                            x1={pt.startX}
+                            y1={pt.y}
+                            x2={pt.endX}
+                            y2={pt.y}
+                            stroke="transparent"
+                            strokeWidth="14"
+                          />
+                          <line
+                            x1={pt.startX}
+                            y1={pt.y}
+                            x2={pt.endX}
+                            y2={pt.y}
+                            stroke={strokeColor}
+                            strokeWidth="3.5"
+                            strokeLinecap="round"
+                          />
+                        </g>
+                      ) : (
+                        <line
+                          x1={pt.startX}
+                          y1={pt.y}
+                          x2={pt.endX}
+                          y2={pt.y}
+                          stroke={strokeColor}
+                          strokeWidth="3.2"
+                          strokeLinecap="round"
+                          className="pointer-events-none"
+                        />
+                      )}
                     </g>
                   );
                 })}
 
-                {/* Actual Emission Markers (Environmental View only: Consistent Solid Filled Emerald Diamonds) */}
+                {/* Actual Emission Markers (Environmental View: Distinct Highlight for Detected vs Missed/Unmonitored Emissions) */}
                 {showActualEmissions &&
                   pts.map((pt) => (
                     <g key={`actual-emissions-group-${pt.obs.id}`}>
                       {pt.emissions.map((em, idx) => {
-                        const isCaughtHere = pt.obs.isIntercepted && pt.obs.bandId === em.bandId;
+                        const isCaughtHere = (pt.obs.isIntercepted && pt.obs.bandId === em.bandId) || em.isDetected;
+                        const emissionFreq = em.freqStr || (em.freqGhz ? `${Number(em.freqGhz).toFixed(2)} GHz` : `Band ${em.bandId}`);
 
                         return (
-                          <g key={`em-marker-${pt.obs.id}-${em.bandId}-${idx}`}>
-                            {/* Solid filled diamond reticle consistent with the legend */}
-                            <polygon
-                              points={`${pt.midX},${em.y - 5} ${pt.midX + 5},${em.y} ${pt.midX},${em.y + 5} ${pt.midX - 5},${em.y}`}
-                              fill="#10B981"
-                              stroke="#FFFFFF"
-                              strokeWidth="1.2"
-                              className="drop-shadow-[0_0_5px_rgba(16,185,129,0.85)]"
-                            />
-                            <title>{`${pt.obs.timestamp} • Target Emission: Band ${em.bandId} (${em.freqStr || em.freqGhz + ' GHz'})${isCaughtHere ? ' • [CAUGHT BY RECEIVER]' : ' • [UNMONITORED]'}`}</title>
+                          <g
+                            key={`em-marker-${pt.obs.id}-${em.bandId}-${idx}`}
+                            style={{ cursor: 'pointer' }}
+                            className="cursor-pointer"
+                            onMouseEnter={(e) => {
+                              const rect = sliderRef.current?.getBoundingClientRect();
+                              const mouseX = e.clientX - (rect?.left || 0) + (sliderRef.current?.scrollLeft || 0);
+                              setHoverInfo({
+                                freq: emissionFreq,
+                                x: mouseX,
+                                y: em.y,
+                              });
+                            }}
+                            onMouseMove={(e) => {
+                              const rect = sliderRef.current?.getBoundingClientRect();
+                              const mouseX = e.clientX - (rect?.left || 0) + (sliderRef.current?.scrollLeft || 0);
+                              setHoverInfo({
+                                freq: emissionFreq,
+                                x: mouseX,
+                                y: em.y,
+                              });
+                            }}
+                            onMouseLeave={() => setHoverInfo(null)}
+                          >
+                            {/* Invisible wider hit area for easy hover targeting on diamond */}
+                            <circle cx={pt.midX} cy={em.y} r="10" fill="transparent" />
+                            {isCaughtHere ? (
+                              /* Detected Emission: Solid Emerald Diamond with Glow */
+                              <polygon
+                                points={`${pt.midX},${em.y - 5.5} ${pt.midX + 5.5},${em.y} ${pt.midX},${em.y + 5.5} ${pt.midX - 5.5},${em.y}`}
+                                fill="#10B981"
+                                stroke="#FFFFFF"
+                                strokeWidth="1.2"
+                                className="drop-shadow-[0_0_6px_rgba(16,185,129,0.9)] pointer-events-none"
+                              />
+                            ) : (
+                              /* Missed / Unmonitored Emission: Muted Slate Diamond */
+                              <polygon
+                                points={`${pt.midX},${em.y - 4.5} ${pt.midX + 4.5},${em.y} ${pt.midX},${em.y + 4.5} ${pt.midX - 4.5},${em.y}`}
+                                fill="#94A3B8"
+                                fillOpacity="0.4"
+                                stroke="#64748B"
+                                strokeWidth="1.2"
+                                className="pointer-events-none"
+                              />
+                            )}
                           </g>
                         );
                       })}
                     </g>
                   ))}
 
-                {/* Leading Edge Cursor (Current Microsecond Position) */}
+                {/* Leading Edge Cursor (Current Dwell Position) */}
                 {cursorX > 0 && (
                   <g>
                     <line
@@ -488,24 +619,56 @@ export default function ObservationsSection({
                   </g>
                 )}
 
-                {/* X-Axis Microsecond Time Ticks */}
-                {pts.map((pt) => (
-                  <text
-                    key={`time-tick-${pt.obs.id}`}
-                    x={pt.midX}
-                    y="222"
-                    textAnchor="middle"
-                    className="text-[9.5px] font-mono fill-slate-500 font-semibold select-none"
-                  >
-                    {pt.obs.timeUs} µs
-                  </text>
-                ))}
+                {/* Standard Cartesian X-Axis Time Ticks: 0 ms, 5 ms, 10 ms, 15 ms, ... */}
+                {pts.length > 0 && (
+                  <g key="x-tick-0">
+                    <line x1={pts[0].startX} y1="205" x2={pts[0].startX} y2="210" stroke="#94A3B8" strokeWidth="1.2" />
+                    <text
+                      x={pts[0].startX}
+                      y="222"
+                      textAnchor="middle"
+                      className="text-[10px] font-mono fill-slate-500 font-semibold select-none"
+                    >
+                      0 ms
+                    </text>
+                  </g>
+                )}
+                {pts.map((pt, idx) => {
+                  const timeMs = pt.obs.endMs !== undefined ? pt.obs.endMs : (idx + 1) * 5;
+                  return (
+                    <g key={`x-tick-${pt.obs.id}`}>
+                      <line x1={pt.endX} y1="205" x2={pt.endX} y2="210" stroke="#94A3B8" strokeWidth="1.2" />
+                      <text
+                        x={pt.endX}
+                        y="222"
+                        textAnchor="middle"
+                        className="text-[10px] font-mono fill-slate-500 font-semibold select-none"
+                      >
+                        {timeMs} ms
+                      </text>
+                    </g>
+                  );
+                })}
               </svg>
+
+              {/* Clean Minimal Hover Tooltip: Shows ONLY the frequency */}
+              {hoverInfo && !isDownRef.current && (
+                <div
+                  className="absolute pointer-events-none select-none z-30 shadow-md rounded-lg bg-slate-900/95 text-emerald-400 border border-slate-700/80 px-2.5 py-1 backdrop-blur-xs font-mono text-[12px] font-bold tracking-wide whitespace-nowrap"
+                  style={{
+                    left: `${Math.min(plotWidth - 55, Math.max(55, hoverInfo.x))}px`,
+                    top: hoverInfo.y < 45 ? `${hoverInfo.y + 12}px` : `${hoverInfo.y - 32}px`,
+                    transform: 'translateX(-50%)',
+                  }}
+                >
+                  {hoverInfo.freq}
+                </div>
+              )}
 
               {/* Standby Message if no observations accumulated yet */}
               {observations.length === 0 && (
                 <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-400 gap-1.5 select-none pointer-events-none">
-                  <span className="material-symbols-outlined text-[24px] text-slate-300">timeline</span>
+                  <BandStepGraphIcon className="w-6 h-6 text-slate-300" />
                   <span className="text-[12px] font-medium">Awaiting scan steps to plot timeline...</span>
                 </div>
               )}
@@ -515,9 +678,9 @@ export default function ObservationsSection({
           {/* Graph Footer Bar: Interaction tip with subtle reduced-size icon and clear visual legend */}
           <div className="flex flex-wrap items-center justify-between gap-2.5 pt-3 border-t border-slate-100 mt-2 text-[11px] text-slate-500 select-none">
             <div className="flex items-center gap-1.5">
-              <span className="material-symbols-outlined text-[11px] text-slate-400">info</span>
+              <span className="material-symbols-outlined text-[13px] text-primary">touch_app</span>
               <span>
-                Horizontal drag or scroll to review recorded scan observations.
+                Hover over intercepted dwells or emissions to inspect exact frequency. Drag to pan timeline.
               </span>
             </div>
 
@@ -526,20 +689,26 @@ export default function ObservationsSection({
               {showInterceptions && (
                 <div className="flex items-center gap-1.5">
                   <span className="w-4 h-1 rounded bg-[#10B981]" />
-                  <span className="text-emerald-700 font-bold">Intercepted (Hit)</span>
+                  <span className="text-emerald-700 font-bold">HIT</span>
                 </div>
               )}
               {showMisses && (
                 <div className="flex items-center gap-1.5">
                   <span className="w-4 h-1 rounded bg-[#F59E0B]" />
-                  <span className="text-amber-700 font-medium">Miss (Searching)</span>
+                  <span className="text-amber-700 font-medium">Scan Miss</span>
                 </div>
               )}
               {showActualEmissions && (
-                <div className="flex items-center gap-1.5">
-                  <span className="w-2.5 h-2.5 rotate-45 bg-[#10B981] border border-white shadow-2xs" />
-                  <span className="text-emerald-800 font-bold">Actual Target Emission</span>
-                </div>
+                <>
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-2.5 h-2.5 rotate-45 bg-[#10B981] border border-white shadow-2xs" />
+                    <span className="text-emerald-800 font-bold">Detected Emission</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-2.5 h-2.5 rotate-45 bg-slate-300 border border-slate-500 shadow-2xs" />
+                    <span className="text-slate-600 font-medium">Missed Emission (Unmonitored)</span>
+                  </div>
+                </>
               )}
             </div>
           </div>
@@ -552,73 +721,99 @@ export default function ObservationsSection({
           {/* Subtitle note on table */}
           <div className="pb-2 text-[11px] text-slate-500 flex items-center justify-between">
             <span>
-              Recorded observations stream ({filteredObservations.length} of {observations.length} total entries)
+              Recorded dwell observations stream ({filteredObservations.length} of {observations.length} total dwells)
             </span>
             <span className="font-mono text-[10px] text-slate-400">Newest events displayed first</span>
           </div>
 
           {/* Scrollable table container */}
           <div className="max-h-[340px] overflow-y-auto overflow-x-auto rounded-xl border border-slate-200 shadow-2xs">
-            <table className="w-full text-left text-xs font-label-sm border-collapse min-w-[550px]">
+            <table className="w-full text-left text-xs font-label-sm border-collapse min-w-[620px]">
               <thead className="bg-slate-50 border-b border-slate-200 sticky top-0 z-10 shadow-2xs">
                 <tr>
-                  <th className="py-2.5 px-3.5 text-slate-600 font-bold uppercase tracking-wider text-[10.5px]">Time (µs)</th>
-                  <th className="py-2.5 px-3.5 text-slate-600 font-bold uppercase tracking-wider text-[10.5px]">Scheduled Band</th>
-                  <th className="py-2.5 px-3.5 text-slate-600 font-bold uppercase tracking-wider text-[10.5px]">Intercepted Frequency</th>
+                  <th className="py-2.5 px-3.5 text-slate-600 font-bold uppercase tracking-wider text-[10.5px] whitespace-nowrap">Time Window</th>
+                  <th className="py-2.5 px-3.5 text-slate-600 font-bold uppercase tracking-wider text-[10.5px] whitespace-nowrap">Selected Band</th>
+                  <th className="py-2.5 px-3.5 text-slate-600 font-bold uppercase tracking-wider text-[10.5px] whitespace-nowrap">Intercepted Frequency</th>
+                  <th className="py-2.5 px-3.5 text-slate-600 font-bold uppercase tracking-wider text-[10.5px] whitespace-nowrap">Result</th>
+                  <th className="py-2.5 px-3.5 text-slate-600 font-bold uppercase tracking-wider text-[10.5px] whitespace-nowrap">Pulses Detected</th>
                   {viewMode === 'environment' && (
-                    <th className="py-2.5 px-3.5 text-emerald-800 font-bold uppercase tracking-wider text-[10.5px]">Actual Emission(s)</th>
+                    <th className="py-2.5 px-3.5 text-emerald-800 font-bold uppercase tracking-wider text-[10.5px] whitespace-nowrap">Active Emissions in Window (Exact Freq)</th>
                   )}
-                  <th className="py-2.5 px-3.5 text-slate-600 font-bold uppercase tracking-wider text-[10.5px]">Frequency Range</th>
-                  <th className="py-2.5 px-3.5 text-slate-600 font-bold uppercase tracking-wider text-[10.5px]">Rx Status</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-on-surface font-mono text-[11px]">
                 {filteredObservations.length > 0 ? (
                   [...filteredObservations].reverse().map((row) => (
                     <tr key={row.id} className="hover:bg-slate-50/80 transition-colors">
-                      <td className="py-2.5 px-3.5 font-bold text-slate-900">{row.timestamp}</td>
-                      <td className="py-2.5 px-3.5 font-semibold text-primary">{row.band}</td>
-                      <td className="py-2.5 px-3.5">
+                      <td className="py-2.5 px-3.5 font-bold text-slate-900 whitespace-nowrap">{row.timeWindow || row.timestamp}</td>
+                      <td className="py-2.5 px-3.5 whitespace-nowrap">
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-semibold text-primary">{row.band}</span>
+                          <span className="text-slate-400 font-mono text-[10px]">({row.range})</span>
+                        </div>
+                      </td>
+                      <td className="py-2.5 px-3.5 whitespace-nowrap font-mono text-[11px]">
                         {row.isIntercepted ? (
-                          <span className="font-bold text-emerald-700 font-mono text-[11px]">
-                            {row.interceptedFreq || row.centerFreq}
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-800 border border-emerald-200 font-bold shadow-2xs whitespace-nowrap">
+                            {row.interceptedFreq && row.interceptedFreq !== '-' ? row.interceptedFreq : row.centerFreq}
                           </span>
                         ) : (
-                          <span className="text-slate-400 font-mono text-[11px]">-</span>
+                          <span className="text-slate-300 font-mono text-[13px] px-2 select-none">-</span>
                         )}
+                      </td>
+                      <td className="py-2.5 px-3.5 whitespace-nowrap">
+                        {row.isIntercepted ? (
+                          <span className="whitespace-nowrap inline-flex items-center justify-center px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 font-bold text-[10px] border border-emerald-200 tracking-wide uppercase shadow-2xs">
+                            HIT
+                          </span>
+                        ) : (
+                          <span className="whitespace-nowrap inline-flex items-center justify-center px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-700 font-semibold text-[10px] border border-amber-200 tracking-wide uppercase">
+                            SCAN MISS
+                          </span>
+                        )}
+                      </td>
+                      <td className="py-2.5 px-3.5 whitespace-nowrap">
+                        <span className={`font-mono text-[11.5px] font-bold ${row.isIntercepted ? 'text-emerald-700' : 'text-slate-400'}`}>
+                          {row.pulsesDetected !== undefined ? row.pulsesDetected : (row.isIntercepted ? 3 : 0)}
+                        </span>
                       </td>
                       {viewMode === 'environment' && (
-                        <td className="py-2.5 px-3.5 text-emerald-800 font-semibold text-[10.5px]">
-                          {row.actualEmissions && row.actualEmissions.length > 0 ? (
-                            row.actualEmissions.map((em, idx) => (
-                              <span key={`em-${row.id}-${em.bandId}-${idx}`}>
-                                {idx > 0 && <span className="text-slate-400 mx-1">•</span>}
-                                Band {em.bandId} <span className="text-emerald-700/80 font-normal">({em.freqStr})</span>
-                              </span>
-                            ))
-                          ) : (
-                            row.actualFreqStr || '-'
-                          )}
+                        <td className="py-2.5 px-3.5 text-slate-700 font-semibold text-[10.5px]">
+                          <div className="flex flex-wrap gap-1.5 items-center">
+                            {row.actualEmissions && row.actualEmissions.length > 0 ? (
+                              row.actualEmissions.map((em, idx) => {
+                                const isDet = (row.isIntercepted && em.bandId === row.bandId) || em.isDetected;
+                                return (
+                                  <span
+                                    key={`em-${row.id}-${em.bandId}-${idx}`}
+                                    className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] border font-mono whitespace-nowrap ${
+                                      isDet
+                                        ? 'bg-emerald-50 text-emerald-800 border-emerald-300 font-bold'
+                                        : 'bg-slate-100 text-slate-600 border-slate-200 font-normal'
+                                    }`}
+                                  >
+                                    <span>Band {em.bandId}</span>
+                                    <span className={isDet ? 'text-emerald-700 font-extrabold' : 'text-slate-600'}>
+                                      ({em.freqStr || (em.freqGhz ? `${em.freqGhz.toFixed(2)} GHz` : '')})
+                                    </span>
+                                    <span className={`text-[9px] uppercase font-bold ml-0.5 ${isDet ? 'text-emerald-900' : 'text-slate-500'}`}>
+                                      {isDet ? '• Detected' : '• Missed'}
+                                    </span>
+                                  </span>
+                                );
+                              })
+                            ) : (
+                              <span className="text-slate-400 font-mono">-</span>
+                            )}
+                          </div>
                         </td>
                       )}
-                      <td className="py-2.5 px-3.5 text-slate-500 text-[10.5px]">{row.range}</td>
-                      <td className="py-2.5 px-3.5">
-                        {row.isIntercepted ? (
-                          <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 font-bold text-[10px] border border-emerald-200 tracking-wide uppercase shadow-2xs">
-                            INTERCEPTED (HIT)
-                          </span>
-                        ) : (
-                          <span className="px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 font-medium text-[10px] border border-amber-200 tracking-wide uppercase">
-                            SEARCHING (MISS)
-                          </span>
-                        )}
-                      </td>
                     </tr>
                   ))
                 ) : (
                   <tr>
                     <td colSpan={viewMode === 'environment' ? 6 : 5} className="py-10 text-center text-slate-400 font-sans text-xs">
-                      No observations matching the selected filter ({currentFilterMeta.label}).
+                      No dwell observations matching the selected filter ({currentFilterMeta.label}).
                     </td>
                   </tr>
                 )}

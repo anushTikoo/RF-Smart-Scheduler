@@ -10,6 +10,7 @@ export default function App() {
   // App states
   const [viewMode, setViewMode] = useState('receiver'); // 'receiver' | 'environment'
   const [isScanning, setIsScanning] = useState(false); // Does NOT start instantly; starts only after dataset upload
+  const [isSimulationComplete, setIsSimulationComplete] = useState(false);
   const [loadedDataset, setLoadedDataset] = useState(null);
   const [toastMessage, setToastMessage] = useState(null);
 
@@ -31,21 +32,27 @@ export default function App() {
   // Simulation metrics for Receiver & Environment views (defaults to '-' before dataset upload)
   const [mlMetrics, setMlMetrics] = useState({
     interceptRate: '-',
+    correctScanRate: '-',
     hitRate: '-',
     probDetection: '-',
     avgInterceptDelay: '-',
+    avgReward: '-',
+    meanRevisitInterval: '-',
     totalHits: '-',
-    totalMisses: '-',
+    totalScanMisses: '-',
     totalActualEmissions: '-',
   });
 
   const [openLoopMetrics, setOpenLoopMetrics] = useState({
     interceptRate: '-',
+    correctScanRate: '-',
     hitRate: '-',
     probDetection: '-',
     avgInterceptDelay: '-',
+    avgReward: '-',
+    meanRevisitInterval: '-',
     totalHits: '-',
-    totalMisses: '-',
+    totalScanMisses: '-',
     totalActualEmissions: '-',
   });
 
@@ -56,6 +63,13 @@ export default function App() {
     const unsubscribe = subscribeTelemetry((snapshot) => {
       if (!snapshot) return;
       setTelemetrySource(snapshot.source || 'connected');
+
+      // Check if simulation sequence finished
+      if (snapshot.isComplete) {
+        setIsScanning(false);
+        setIsSimulationComplete(true);
+        showToast(snapshot.completionMessage || 'Simulation completed! All 20 dwell windows (100 ms) processed across cognitive environment.');
+      }
 
       if (snapshot.environment) {
         setActualEmissionBand(snapshot.environment.actualEmissionBand);
@@ -75,7 +89,7 @@ export default function App() {
           setMlMetrics(snapshot.adaptive.metrics);
         }
 
-        // Dynamically append observation for Adaptive ML Scan
+        // Dynamically append dwell observation for Adaptive ML Scan (5 ms dwell window)
         const bandId = snapshot.adaptive.currentBand;
         if (bandId) {
           const bConf = (BAND_CONFIG && BAND_CONFIG.find(b => b.id === bandId)) || {
@@ -84,21 +98,33 @@ export default function App() {
             range: `Band ${bandId}`,
           };
           const isHit = Boolean(snapshot.adaptive.isIntercepted);
-          timeUsRef.current += 150; // increments in microseconds (150 µs per scan dwell)
           obsIdRef.current += 1;
+          const startMs = (obsIdRef.current - 1) * 5;
+          const endMs = startMs + 5;
+          const timeWindow = `${startMs}–${endMs} ms`;
+          const pulsesDetected = snapshot.adaptive.pulsesDetected !== undefined
+            ? snapshot.adaptive.pulsesDetected
+            : (isHit ? 3 : 0);
+          const result = isHit ? 'HIT' : 'SCAN MISS';
 
           // Parse actual emission frequencies (support single and multiple simultaneous emissions)
           const envBands = snapshot.environment?.actualEmissionBands || (snapshot.environment?.actualEmissionBand ? [snapshot.environment.actualEmissionBand] : []);
           const emissionsList = snapshot.environment?.emissions || envBands.map((bId) => {
             const c = BAND_CONFIG.find(b => b.id === bId);
-            return { bandId: bId, freq: c ? c.center : '', type: '' };
+            return { bandId: bId, freq: c ? c.center : '', type: '', pulses: 3 };
           });
-          const actualEmissionsData = emissionsList.map((e) => ({
-            bandId: e.bandId,
-            freqStr: e.freq,
-            freqGhz: parseFloat(e.freq) || (BAND_CONFIG.find(b => b.id === e.bandId) ? parseFloat(BAND_CONFIG.find(b => b.id === e.bandId).center) : null),
-            type: e.type,
-          }));
+          const actualEmissionsData = emissionsList.map((e) => {
+            const isDetected = e.bandId === bandId;
+            return {
+              bandId: e.bandId,
+              freqStr: e.freq,
+              freqGhz: parseFloat(e.freq) || (BAND_CONFIG.find(b => b.id === e.bandId) ? parseFloat(BAND_CONFIG.find(b => b.id === e.bandId).center) : null),
+              type: e.type,
+              pulses: e.pulses || 3,
+              isDetected: isDetected,
+              status: isDetected ? 'DETECTED' : `Missed (Receiver on Band ${bandId})`,
+            };
+          });
 
           let scanFreq = parseFloat(bConf.center);
           if (isHit && snapshot.adaptive.interceptedFrequency) {
@@ -108,15 +134,21 @@ export default function App() {
           setObservations((prev) => {
             const newEntry = {
               id: obsIdRef.current,
-              timeUs: timeUsRef.current,
-              timestamp: `${timeUsRef.current} µs`,
+              dwellIndex: obsIdRef.current,
+              startMs,
+              endMs,
+              timeWindow,
+              timestamp: timeWindow,
               band: `Band ${bandId}`,
               bandId: bandId,
               centerFreq: bConf.center,
               interceptedFreq: isHit ? (snapshot.adaptive.interceptedFrequency || bConf.center) : '-',
+              exactFreq: isHit ? (snapshot.adaptive.interceptedFrequency || bConf.center) : bConf.center,
               range: bConf.range,
               freqGhz: scanFreq || (0.5 + bandId * 0.875),
-              status: isHit ? 'INTERCEPTED' : 'MISS',
+              status: result,
+              result: result,
+              pulsesDetected: pulsesDetected,
               isIntercepted: isHit,
               actualBands: envBands,
               actualBand: envBands.length > 0 ? envBands[0] : null,
@@ -154,6 +186,7 @@ export default function App() {
     setObservations([]);
     timeUsRef.current = 0;
     obsIdRef.current = 0;
+    setIsSimulationComplete(false);
     setIsScanning(true); // Automatically starts running after uploading a dataset
     showToast(`Dataset loaded: ${file.name}. Starting cognitive RF scan scheduler...`);
   };
@@ -168,9 +201,18 @@ export default function App() {
     showToast(nextState ? 'Simulation resumed.' : 'Simulation paused.');
   };
 
+  const handleReplaySimulation = () => {
+    setObservations([]);
+    obsIdRef.current = 0;
+    setIsSimulationComplete(false);
+    setIsScanning(true);
+    showToast('Replaying simulation from 0 ms...');
+  };
+
   const handleClearSimulation = () => {
     setLoadedDataset(null);
     setIsScanning(false);
+    setIsSimulationComplete(false);
     setObservations([]);
     timeUsRef.current = 0;
     obsIdRef.current = 0;
@@ -183,26 +225,32 @@ export default function App() {
     setOpenLoopInterceptedFreq(null);
     setMlMetrics({
       interceptRate: '-',
+      correctScanRate: '-',
       hitRate: '-',
       probDetection: '-',
       avgInterceptDelay: '-',
+      avgReward: '-',
+      meanRevisitInterval: '-',
       totalHits: '-',
-      totalMisses: '-',
+      totalScanMisses: '-',
       totalActualEmissions: '-',
     });
     setOpenLoopMetrics({
       interceptRate: '-',
+      correctScanRate: '-',
       hitRate: '-',
       probDetection: '-',
       avgInterceptDelay: '-',
+      avgReward: '-',
+      meanRevisitInterval: '-',
       totalHits: '-',
-      totalMisses: '-',
+      totalScanMisses: '-',
       totalActualEmissions: '-',
     });
     if (viewMode === 'environment') {
       setViewMode('receiver');
     }
-    showToast('Simulation cleared. Dataset unloaded.');
+    showToast('Simulation removed. Dataset unloaded.');
   };
 
   return (
@@ -255,32 +303,52 @@ export default function App() {
                 </span>
               </div>
 
-              {/* Pause / Resume Simulation Button */}
-              <button
-                onClick={handleTogglePause}
-                type="button"
-                className={`flex items-center gap-1 px-2.5 py-1 rounded-lg font-label-md text-[11px] font-medium transition-colors select-none cursor-pointer ${
-                  isScanning
-                    ? 'bg-slate-50 hover:bg-amber-50 text-slate-700 hover:text-amber-800 border border-slate-200 hover:border-amber-300'
-                    : 'bg-slate-50 hover:bg-emerald-50 text-slate-700 hover:text-emerald-800 border border-slate-200 hover:border-emerald-300'
-                }`}
-                title={isScanning ? 'Pause the ongoing simulation' : 'Resume scanning simulation'}
-              >
-                <span className="material-symbols-outlined text-[15px]">
-                  {isScanning ? 'pause' : 'play_arrow'}
-                </span>
-                <span>{isScanning ? 'Pause Simulation' : 'Resume Simulation'}</span>
-              </button>
+              {/* Pause / Resume OR Replay Simulation Button */}
+              {isSimulationComplete ? (
+                <button
+                  onClick={handleReplaySimulation}
+                  type="button"
+                  className="flex items-center gap-1 px-2.5 py-1 rounded-lg font-label-md text-[11px] font-medium bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 transition-colors select-none cursor-pointer shadow-2xs"
+                  title="Replay the 5 ms dwell simulation from the beginning"
+                >
+                  <span className="material-symbols-outlined text-[15px]">replay</span>
+                  <span>Replay Simulation</span>
+                </button>
+              ) : (
+                <button
+                  onClick={handleTogglePause}
+                  type="button"
+                  className={`flex items-center gap-1 px-2.5 py-1 rounded-lg font-label-md text-[11px] font-medium transition-colors select-none cursor-pointer ${
+                    isScanning
+                      ? 'bg-slate-50 hover:bg-amber-50 text-slate-700 hover:text-amber-800 border border-slate-200 hover:border-amber-300'
+                      : 'bg-slate-50 hover:bg-emerald-50 text-slate-700 hover:text-emerald-800 border border-slate-200 hover:border-emerald-300'
+                  }`}
+                  title={isScanning ? 'Pause the ongoing simulation' : 'Resume scanning simulation'}
+                >
+                  <span className="material-symbols-outlined text-[15px]">
+                    {isScanning ? 'pause' : 'play_arrow'}
+                  </span>
+                  <span>{isScanning ? 'Pause Simulation' : 'Resume Simulation'}</span>
+                </button>
+              )}
 
-              {/* Stop / Clear Simulation Button */}
+              {/* Simulation Complete Status Badge */}
+              {isSimulationComplete && (
+                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-50 border border-blue-200 text-blue-800 text-[11px] font-semibold select-none shadow-2xs">
+                  <span className="material-symbols-outlined text-[15px] text-blue-600">task_alt</span>
+                  <span>Simulation Complete (20 Dwells)</span>
+                </div>
+              )}
+
+              {/* Remove Simulation Button (Renamed from Stop Simulation) */}
               <button
                 onClick={handleClearSimulation}
                 type="button"
                 className="flex items-center gap-1 px-2.5 py-1 rounded-lg font-label-md text-[11px] font-medium text-slate-600 hover:text-rose-700 bg-slate-50 hover:bg-rose-50 border border-slate-200 hover:border-rose-200 transition-colors cursor-pointer select-none"
-                title="Stop simulation, unload dataset, and return to default state"
+                title="Remove simulation, unload dataset, and return to default state"
               >
-                <span className="material-symbols-outlined text-[14px]">close</span>
-                <span>Stop Simulation</span>
+                <span className="material-symbols-outlined text-[14px]">delete_outline</span>
+                <span>Remove Simulation</span>
               </button>
             </div>
           </div>
@@ -300,6 +368,7 @@ export default function App() {
             interceptedFrequency={mlInterceptedFreq}
             metrics={mlMetrics}
             isScanning={isScanning}
+            isCompleted={isSimulationComplete}
             hasDataset={!!loadedDataset}
           />
 
@@ -315,11 +384,12 @@ export default function App() {
             interceptedFrequency={openLoopInterceptedFreq}
             metrics={openLoopMetrics}
             isScanning={isScanning}
+            isCompleted={isSimulationComplete}
             hasDataset={!!loadedDataset}
           />
         </div>
 
-        {/* Bottom Section: Observations Graph/Table (Hidden until dataset is uploaded) & RL Parameters Accordion */}
+        {/* Bottom Section: Observations Graph/Table & RL Parameters Accordion with Live Average Reward */}
         <div className="flex flex-col gap-6">
           {loadedDataset && (
             <ObservationsSection
@@ -330,7 +400,10 @@ export default function App() {
               onExportNotify={showToast}
             />
           )}
-          <RLParametersAccordion />
+          <RLParametersAccordion
+            avgReward={mlMetrics.avgReward || '+0.74'}
+            hasDataset={!!loadedDataset}
+          />
         </div>
       </main>
 
