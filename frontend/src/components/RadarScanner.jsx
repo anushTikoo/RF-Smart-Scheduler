@@ -65,6 +65,7 @@ export default function RadarScanner({
   viewMode = "receiver", // "receiver" | "environment"
   currentBand = null,
   actualEmissionBand = null,
+  actualEmissionBands = null,
   emissionFrequency = null,
   interceptedFrequency = null,
   metrics = {},
@@ -73,9 +74,18 @@ export default function RadarScanner({
 }) {
   const isAdaptive = type === 'adaptive';
   const bandInfo = currentBand ? (BAND_CONFIG.find((b) => b.id === currentBand) || null) : null;
-  const emissionBandInfo = actualEmissionBand ? (BAND_CONFIG.find((b) => b.id === actualEmissionBand) || null) : null;
-  const isIntercepted = Boolean(currentBand && actualEmissionBand && currentBand === actualEmissionBand);
-  const detectedFreq = interceptedFrequency || (isIntercepted && emissionFrequency ? emissionFrequency : (isIntercepted && bandInfo ? bandInfo.center : null));
+
+  // Support both single emissionBand and multiple simultaneous emissionBands
+  const emissionBands = (actualEmissionBands && actualEmissionBands.length > 0)
+    ? actualEmissionBands
+    : (actualEmissionBand ? [actualEmissionBand] : []);
+
+  const emissionBandInfos = emissionBands.map((id) => BAND_CONFIG.find((b) => b.id === id)).filter(Boolean);
+  const emissionBandInfo = emissionBandInfos.length > 0 ? emissionBandInfos[0] : null;
+
+  const isIntercepted = Boolean(currentBand && emissionBands.includes(currentBand));
+  const matchedBandInfo = emissionBandInfos.find((b) => b.id === currentBand);
+  const detectedFreq = interceptedFrequency || (isIntercepted && matchedBandInfo ? matchedBandInfo.center : (bandInfo ? bandInfo.center : null));
 
   const RADAR_RADIUS = 130;
 
@@ -91,7 +101,6 @@ export default function RadarScanner({
   });
 
   const wedgePathOuter = bandInfo ? getSectorPath(200, 200, RADAR_RADIUS, bandInfo.startDeg, bandInfo.endDeg) : null;
-  const emissionWedgePath = emissionBandInfo ? getSectorPath(200, 200, RADAR_RADIUS, emissionBandInfo.startDeg, emissionBandInfo.endDeg) : null;
 
   return (
     <div className="bg-white rounded-2xl shadow-[0_2px_10px_rgba(0,0,0,0.04)] border border-slate-200 p-5 sm:p-6 flex flex-col justify-between items-center transition-all">
@@ -102,7 +111,7 @@ export default function RadarScanner({
           {isAdaptive ? (
             <span
               className="material-symbols-outlined text-[22px] text-primary select-none drop-shadow-[0_0_8px_rgba(0,198,215,0.6)]"
-              title="Adaptive ML: Cognitive Neural Band Scheduling (DQN)"
+              title="Adaptive ML: Cognitive Band Scheduling (Contextual Bandit)"
             >
               neurology
             </span>
@@ -114,9 +123,11 @@ export default function RadarScanner({
               sync
             </span>
           )}
-          <h2 className="font-label-md text-[13px] font-semibold text-on-surface uppercase tracking-wider">
-            {title}
-          </h2>
+          <div className="flex items-center gap-2">
+            <h2 className="font-label-md text-[13px] font-semibold text-on-surface uppercase tracking-wider">
+              {title}
+            </h2>
+          </div>
         </div>
 
         {/* Scanning Badge on each scanner (Only shown when a dataset is loaded; no 'Awaiting Dataset' badge) */}
@@ -183,16 +194,26 @@ export default function RadarScanner({
             )
           )}
 
-          {/* Environmental View: Actual Target Emission Band Highlight (Green Outline & Soft Glow) */}
-          {viewMode === 'environment' && hasDataset && isScanning && emissionWedgePath && (
-            <path
-              d={emissionWedgePath}
-              fill={currentBand === actualEmissionBand ? "rgba(16, 185, 129, 0.22)" : "rgba(16, 185, 129, 0.12)"}
-              stroke="#10B981"
-              strokeWidth={currentBand === actualEmissionBand ? "3" : "2.5"}
-              strokeDasharray={currentBand === actualEmissionBand ? "none" : "5 2.5"}
-              className="transition-all duration-300 pointer-events-none drop-shadow-[0_0_8px_rgba(16,185,129,0.7)]"
-            />
+          {/* Environmental View: Actual Target Emission Band Highlights (Green Outline & Soft Glow for each active emitter) */}
+          {viewMode === 'environment' && hasDataset && isScanning && emissionBands.length > 0 && (
+            emissionBands.map((eBandId) => {
+              const eInfo = BAND_CONFIG.find((b) => b.id === eBandId);
+              if (!eInfo) return null;
+              const path = getSectorPath(200, 200, RADAR_RADIUS, eInfo.startDeg, eInfo.endDeg);
+              const isHitThisBand = currentBand === eBandId;
+
+              return (
+                <path
+                  key={`emission-wedge-${eBandId}`}
+                  d={path}
+                  fill={isHitThisBand ? "rgba(16, 185, 129, 0.28)" : "rgba(16, 185, 129, 0.15)"}
+                  stroke="#10B981"
+                  strokeWidth={isHitThisBand ? "3" : "2.2"}
+                  strokeDasharray={isHitThisBand ? "none" : "5 2.5"}
+                  className="pointer-events-none drop-shadow-[0_0_8px_rgba(16,185,129,0.7)]"
+                />
+              );
+            })
           )}
 
           {/* Informational sectors (hover tooltip for band range; clicking disabled) */}
@@ -279,7 +300,7 @@ export default function RadarScanner({
 
       {/* Environmental View Legend: Explaining Scheduled/Sweep vs Actual Emission Bands with Band No & GHz */}
       {viewMode === 'environment' && (
-        hasDataset && isScanning && bandInfo && emissionBandInfo ? (
+        hasDataset && isScanning && bandInfo && emissionBands.length > 0 ? (
           <div className="w-full my-1 flex flex-wrap items-center justify-between gap-2 py-1.5 px-3 rounded-xl bg-slate-50 border border-slate-200/90 text-[11px] font-medium select-none shadow-2xs">
             <div className="flex flex-wrap items-center gap-3">
               {/* Scanned Receiver Band */}
@@ -295,12 +316,18 @@ export default function RadarScanner({
                 </span>
               </div>
 
-              {/* Actual Emission Band */}
-              <div className="flex items-center gap-1.5">
+              {/* Actual Emission Bands (Single or Multiple Simultaneous) */}
+              <div className="flex items-center gap-1.5 flex-wrap">
                 <span className="w-3 h-3 rounded-xs bg-emerald-500/20 border-2 border-dashed border-emerald-500 shadow-2xs" />
                 <span className="text-emerald-800 font-bold">
-                  Actual Emission: <span className="font-mono text-emerald-900 font-bold">Band {emissionBandInfo.id}</span>
-                  <span className="text-emerald-700/80 font-mono text-[10.5px] ml-1 font-normal">({emissionBandInfo.range})</span>
+                  {emissionBandInfos.length > 1 ? 'Actual Emissions:' : 'Actual Emission:'}{' '}
+                  {emissionBandInfos.map((eInfo, idx) => (
+                    <span key={`eband-label-${eInfo.id}`}>
+                      {idx > 0 && <span className="text-slate-400 font-normal mx-1">•</span>}
+                      <span className="font-mono text-emerald-900 font-bold">Band {eInfo.id}</span>
+                      <span className="text-emerald-700/80 font-mono text-[10px] ml-0.5 font-normal">({eInfo.center})</span>
+                    </span>
+                  ))}
                 </span>
               </div>
             </div>
@@ -465,22 +492,16 @@ export default function RadarScanner({
             </div>
           </div>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 w-full pt-1">
-            <div className="flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-slate-100/70 text-slate-600 font-mono text-[10.5px]">
-              <span>HIT:</span>
+          <div className="grid grid-cols-3 gap-2 w-full pt-1">
+            <div className="flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-slate-100/70 text-slate-600 font-mono text-[10px] sm:text-[10.5px]">
+              <span>HIT / Detected:</span>
               <span className="font-bold text-slate-900">{hasDataset ? (metrics.totalHits && metrics.totalHits !== '-' ? metrics.totalHits : (isAdaptive ? 432 : 168)) : '-'}</span>
             </div>
-            <div className="flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-slate-100/70 text-slate-600 font-mono text-[10.5px]">
+            <div className="flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-slate-100/70 text-slate-600 font-mono text-[10px] sm:text-[10.5px]">
               <span>MISS:</span>
               <span className="font-bold text-slate-900">{hasDataset ? (metrics.totalMisses && metrics.totalMisses !== '-' ? metrics.totalMisses : (isAdaptive ? 268 : 532)) : '-'}</span>
             </div>
-            <div className="flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-slate-100/70 text-slate-600 font-mono text-[10.5px]">
-              <span>Detected:</span>
-              <span className="font-bold text-slate-900">
-                {hasDataset ? (metrics.totalDetected && metrics.totalDetected !== '-' ? metrics.totalDetected : (isAdaptive ? 432 : 168)) : '-'}
-              </span>
-            </div>
-            <div className="flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-slate-100/70 text-slate-600 font-mono text-[10.5px]">
+            <div className="flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-slate-100/70 text-slate-600 font-mono text-[10px] sm:text-[10.5px]">
               <span>Total Em.:</span>
               <span className="font-bold text-slate-900">
                 {hasDataset ? (metrics.totalActualEmissions && metrics.totalActualEmissions !== '-' ? metrics.totalActualEmissions : (isAdaptive ? 488 : 408)) : '-'}

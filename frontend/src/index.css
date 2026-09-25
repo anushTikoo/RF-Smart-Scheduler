@@ -151,3 +151,64 @@
 .group:hover .upload-hover-anim {
   animation: uploadFloatBounce 0.55s ease-in-out 1;
 }
+
+/* Header View Mode Toggle Animations (Plays once on hover) */
+
+/* 1. Earth 3D Planetary Sphere Rotation around Y-axis (rotates horizontally like a 3D sphere, not a flat wheel) */
+@keyframes earthSphereRotateOnce {
+  0% {
+    transform: perspective(220px) rotateY(0deg);
+  }
+  100% {
+    transform: perspective(220px) rotateY(360deg);
+  }
+}
+
+.group:hover .earth-sphere-inner {
+  transform-box: view-box;
+  transform-origin: 12px 12px;
+  animation: earthSphereRotateOnce 0.85s cubic-bezier(0.25, 1, 0.5, 1) 1;
+}
+
+/* 2. Receiver Wave Arcs - Radiates smoothly around the stationary center dot and stays in 100% sharp focus */
+@keyframes waveInnerOnce {
+  0% {
+    transform: scale(0.95);
+    opacity: 0.85;
+  }
+  45% {
+    transform: scale(1.12);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes waveOuterOnce {
+  0% {
+    transform: scale(0.95);
+    opacity: 0.8;
+  }
+  55% {
+    transform: scale(1.14);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.group:hover .receiver-wave-inner {
+  transform-box: view-box;
+  transform-origin: 12px 12px;
+  animation: waveInnerOnce 0.6s ease-out 1;
+}
+
+.group:hover .receiver-wave-outer {
+  transform-box: view-box;
+  transform-origin: 12px 12px;
+  animation: waveOuterOnce 0.75s ease-out 1;
+}

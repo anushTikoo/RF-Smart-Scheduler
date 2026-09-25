@@ -1,22 +1,47 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 
-const DEFAULT_OBSERVATIONS = [
-  { id: 1, timestamp: "t=528.2s", band: "Band 14", centerFreq: "12.31 GHz", signalType: "Pulsed Radar (Ku-Band)", duration: "22 μs", status: "Intercepted", confidence: "98.4%" },
-  { id: 2, timestamp: "t=482.0s", band: "Band 18", centerFreq: "15.81 GHz", signalType: "Frequency Agility Chirp", duration: "45 μs", status: "Intercepted", confidence: "94.1%" },
-  { id: 3, timestamp: "t=410.5s", band: "Band 3", centerFreq: "2.69 GHz", signalType: "Tactical Comms Jammer", duration: "110 μs", status: "Intercepted", confidence: "99.2%" },
-  { id: 4, timestamp: "t=312.8s", band: "Band 13", centerFreq: "11.44 GHz", signalType: "Target Tracking Radar", duration: "18 μs", status: "Intercepted", confidence: "96.8%" },
-  { id: 5, timestamp: "t=184.1s", band: "Band 7", centerFreq: "6.19 GHz", signalType: "Phased Array Acquisition", duration: "60 μs", status: "Intercepted", confidence: "91.5%" },
-  { id: 6, timestamp: "t=122.4s", band: "Band 11", centerFreq: "9.69 GHz", signalType: "Fire Control Radar", duration: "30 μs", status: "Intercepted", confidence: "95.2%" },
-  { id: 7, timestamp: "t=88.0s", band: "Band 16", centerFreq: "14.06 GHz", signalType: "Airborne Early Warning", duration: "85 μs", status: "Intercepted", confidence: "97.0%" },
-];
+export default function ObservationsSection({
+  observations = [],
+  isScanning = false,
+  hasDataset = false,
+  viewMode = 'receiver', // 'receiver' | 'environment'
+  onExportNotify,
+}) {
+  const [displayMode, setDisplayMode] = useState('graph'); // 'graph' | 'table'
+  const [filter, setFilter] = useState('all'); // 'all' | 'interceptions' | 'misses' | 'emissions'
+  const [isViewDropdownOpen, setIsViewDropdownOpen] = useState(false);
+  const [isFilterDropdownOpen, setIsFilterDropdownOpen] = useState(false);
 
-export default function ObservationsSection({ onExportNotify }) {
-  const [viewMode, setViewMode] = useState('graph'); // 'graph' | 'table'
-  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const sliderRef = useRef(null);
   const isDownRef = useRef(false);
   const startXRef = useRef(0);
   const scrollLeftRef = useRef(0);
+
+  // Fallback to 'all' if user switched to receiver view while 'emissions' was selected
+  const effectiveFilter = (viewMode === 'receiver' && filter === 'emissions') ? 'all' : filter;
+
+  // Filter options based on whether we are in Receiver View or Environmental View
+  const filterOptions = viewMode === 'environment'
+    ? [
+        { id: 'all', label: 'All', desc: 'Hits, Misses & Emissions' },
+        { id: 'interceptions', label: 'Interceptions Only', desc: 'Detected hits only' },
+        { id: 'misses', label: 'Misses Only', desc: 'Searching misses only' },
+        { id: 'emissions', label: 'Actual Emissions Only', desc: 'Target emissions only' },
+      ]
+    : [
+        { id: 'all', label: 'Both (Hits & Misses)', desc: 'Full receiver scan timeline' },
+        { id: 'interceptions', label: 'Interceptions Only', desc: 'Detected hits only' },
+        { id: 'misses', label: 'Misses Only', desc: 'Searching misses only' },
+      ];
+
+  const currentFilterMeta = filterOptions.find((f) => f.id === effectiveFilter) || filterOptions[0];
+
+  // Auto-scroll graph to newest observation smoothly without CSS transition jitter
+  useEffect(() => {
+    if (sliderRef.current && isScanning && !isDownRef.current) {
+      sliderRef.current.scrollLeft = sliderRef.current.scrollWidth;
+    }
+  }, [observations.length, isScanning]);
 
   // Mouse pan handlers for the graph
   const handleMouseDown = (e) => {
@@ -38,118 +63,267 @@ export default function ObservationsSection({ onExportNotify }) {
     sliderRef.current.scrollLeft = scrollLeftRef.current - walk;
   };
 
+  // Filter rows for the tabular view and CSV export
+  const filteredObservations = observations.filter((obs) => {
+    if (effectiveFilter === 'interceptions') return obs.isIntercepted;
+    if (effectiveFilter === 'misses') return !obs.isIntercepted;
+    return true; // 'all' and 'emissions'
+  });
+
   // CSV download function
   const handleExportCSV = () => {
-    const headers = ["Timestamp", "Frequency Band", "Center Frequency", "Signal Type", "Duration", "Rx Status", "Confidence"];
-    const rows = DEFAULT_OBSERVATIONS.map(obs => [
-      obs.timestamp,
-      obs.band,
-      obs.centerFreq,
-      `"${obs.signalType}"`,
-      obs.duration,
-      obs.status,
-      obs.confidence
-    ]);
+    if (!filteredObservations || filteredObservations.length === 0) {
+      if (onExportNotify) {
+        onExportNotify("No observations matching filter to export.");
+      }
+      return;
+    }
 
-    const csvContent = "data:text/csv;charset=utf-8," + [
-      headers.join(","),
-      ...rows.map(e => e.join(","))
-    ].join("\n");
+    const isEnv = viewMode === 'environment';
+    const headers = isEnv
+      ? ["Time (µs)", "Scheduled Band", "Intercepted Frequency", "Actual Emission(s)", "Frequency Range", "Rx Status"]
+      : ["Time (µs)", "Scheduled Band", "Intercepted Frequency", "Frequency Range", "Rx Status"];
+
+    const rows = filteredObservations.map((obs) => {
+      const emissionStr = obs.actualEmissions && obs.actualEmissions.length > 0
+        ? obs.actualEmissions.map((e) => `Band ${e.bandId} (${e.freqStr})`).join(' • ')
+        : (obs.actualFreqStr || '-');
+
+      return isEnv
+        ? [
+            `"${obs.timestamp || obs.timeUs + ' µs'}"`,
+            `"${obs.band}"`,
+            `"${obs.interceptedFreq || (obs.isIntercepted ? obs.centerFreq : '-')}"`,
+            `"${emissionStr}"`,
+            `"${obs.range}"`,
+            `"${obs.status}"`,
+          ]
+        : [
+            `"${obs.timestamp || obs.timeUs + ' µs'}"`,
+            `"${obs.band}"`,
+            `"${obs.interceptedFreq || (obs.isIntercepted ? obs.centerFreq : '-')}"`,
+            `"${obs.range}"`,
+            `"${obs.status}"`,
+          ];
+    });
+
+    const csvContent =
+      "data:text/csv;charset=utf-8," +
+      [headers.join(","), ...rows.map((e) => e.join(","))].join("\n");
 
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `rf_observations_${Date.now()}.csv`);
+    link.setAttribute("download", `adaptive_ml_observations_${viewMode}_${effectiveFilter}_${Date.now()}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
 
     if (onExportNotify) {
-      onExportNotify("Observations exported as CSV file");
+      onExportNotify(`Exported ${filteredObservations.length} ${viewMode} observations as CSV`);
     }
   };
 
+  // Coordinate mapping for SVG Graph:
+  // 0.50 GHz (bottom) maps to Y=205, 18.00 GHz (top) maps to Y=25. Usable height = 180px.
+  const slotWidth = 56;
+  const paddingLeft = 24;
+  const paddingRight = 50;
+  const plotWidth = Math.max(680, paddingLeft + observations.length * slotWidth + paddingRight);
+  const plotHeight = 230;
+
+  // Exact mathematical mapping: clamped between 0.5 and 18.0 GHz
+  const getY = (freqGhz) => {
+    const clamped = Math.min(18.0, Math.max(0.5, freqGhz || 0.5));
+    return 205 - ((clamped - 0.5) / 17.5) * 180;
+  };
+
+  // Prepare geometry for each observation step
+  // Dwell segment covers the entire slot width so green (hit) and yellow (miss) lines are continuous
+  const pts = observations.map((obs, i) => {
+    const startX = paddingLeft + i * slotWidth;
+    const endX = startX + slotWidth;
+    const midX = (startX + endX) / 2;
+    const y = getY(obs.freqGhz);
+
+    // Calculate Y for all actual emissions (single or simultaneous multi-emitter)
+    const emissions = (obs.actualEmissions || []).map((em) => ({
+      ...em,
+      y: getY(em.freqGhz),
+    }));
+
+    return {
+      obs,
+      startX,
+      endX,
+      midX,
+      y,
+      emissions,
+    };
+  });
+
+  // Direct vertical lines connecting receiver band decisions between consecutive steps
+  // Only rendered when 'all' filter is active (i.e. both hits and misses toggled)
+  const verticalLines = [];
+  if (effectiveFilter === 'all' && pts.length > 1) {
+    for (let i = 1; i < pts.length; i++) {
+      const prev = pts[i - 1];
+      const curr = pts[i];
+      if (prev.y !== curr.y) {
+        verticalLines.push({
+          id: `vl-${curr.obs.id}`,
+          x: curr.startX,
+          y1: prev.y,
+          y2: curr.y,
+        });
+      }
+    }
+  }
+
+  const latestPt = pts.length > 0 ? pts[pts.length - 1] : null;
+  const cursorX = latestPt ? latestPt.endX : 0;
+
+  // Control visibility of graph layers based on viewMode and active filter
+  const showInterceptions = effectiveFilter === 'all' || effectiveFilter === 'interceptions';
+  const showMisses = effectiveFilter === 'all' || effectiveFilter === 'misses';
+  const showActualEmissions = viewMode === 'environment' && (effectiveFilter === 'all' || effectiveFilter === 'emissions');
+
   return (
-    <div className="bg-white rounded-2xl shadow-[0_2px_10px_rgba(0,0,0,0.04)] border border-slate-200 p-5 sm:p-6 flex flex-col">
+    <div className="bg-white rounded-2xl shadow-[0_2px_10px_rgba(0,0,0,0.04)] border border-slate-200 p-5 sm:p-6 flex flex-col overflow-hidden">
       {/* Header bar */}
       <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-slate-100">
         <div className="flex flex-col gap-0.5">
           <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-primary"></span>
+            <span className="material-symbols-outlined text-[20px] text-primary select-none">
+              timeline
+            </span>
             <h3 className="font-label-md text-label-md font-semibold text-on-surface uppercase tracking-wide">
               Frequency vs. Time Observations
             </h3>
           </div>
-          <p className="font-body-sm text-[12px] text-primary font-medium pl-4">
-            Scanned bands and detected emissions
+          <p className="font-body-sm text-[11px] text-slate-500 font-normal pl-7">
+            Adaptive ML scan timeline • <span className="font-semibold text-slate-700 capitalize">{viewMode} View</span>
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
-          {/* View Switcher Pill Dropdown */}
+        <div className="flex items-center gap-2.5 sm:gap-3 flex-wrap">
+          {/* Filter Dropdown Pill */}
           <div className="relative inline-block">
             <button
-              className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white border border-slate-200 shadow-xs text-primary font-label-md text-[12px] font-semibold hover:border-primary/50 transition-all cursor-pointer"
-              id="view-graph-btn"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white border border-slate-200 shadow-2xs text-slate-700 hover:text-slate-900 font-label-md text-[11.5px] font-semibold hover:border-primary/50 transition-all cursor-pointer"
               type="button"
-              onClick={() => setIsDropdownOpen(prev => !prev)}
+              onClick={() => {
+                setIsFilterDropdownOpen((prev) => !prev);
+                setIsViewDropdownOpen(false);
+              }}
             >
-              <span className="material-symbols-outlined text-[15px] text-primary" id="graph-view-icon">
-                {viewMode === 'graph' ? 'show_chart' : 'table_chart'}
-              </span>
-              <span id="current-graph-view-label">
-                {viewMode === 'graph' ? 'Graph View' : 'Tabular View'}
-              </span>
-              <span className={`material-symbols-outlined text-[16px] text-primary transition-transform duration-200 ${isDropdownOpen ? 'rotate-180' : ''}`}>
+              <span className="material-symbols-outlined text-[16px] text-primary">filter_list</span>
+              <span>Filter: <strong className="text-slate-900 font-bold">{currentFilterMeta.label}</strong></span>
+              <span className={`material-symbols-outlined text-[15px] text-slate-400 transition-transform duration-200 ${isFilterDropdownOpen ? 'rotate-180' : ''}`}>
                 expand_more
               </span>
             </button>
 
-            {isDropdownOpen && (
-              <div className="absolute right-0 top-full mt-1.5 w-40 bg-white border border-slate-200 rounded-xl shadow-[0_4px_16px_rgba(0,0,0,0.06)] p-1 z-50 animate-in fade-in slide-in-from-top-1 duration-150">
+            {isFilterDropdownOpen && (
+              <div className="absolute right-0 top-full mt-1.5 w-52 bg-white border border-slate-200 rounded-xl shadow-[0_4px_16px_rgba(0,0,0,0.08)] p-1 z-50 animate-in fade-in slide-in-from-top-1 duration-150">
+                <div className="px-2.5 py-1 text-[10px] uppercase font-bold text-slate-400 tracking-wider">
+                  Show in {viewMode} view
+                </div>
+                {filterOptions.map((opt) => (
+                  <button
+                    key={opt.id}
+                    className={`w-full flex flex-col px-2.5 py-1.5 rounded-lg text-left transition-colors cursor-pointer ${
+                      effectiveFilter === opt.id
+                        ? 'bg-slate-50 text-primary font-semibold'
+                        : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                    }`}
+                    onClick={() => {
+                      setFilter(opt.id);
+                      setIsFilterDropdownOpen(false);
+                    }}
+                    type="button"
+                  >
+                    <div className="flex items-center justify-between w-full">
+                      <span className="text-[11.5px] font-medium">{opt.label}</span>
+                      {effectiveFilter === opt.id && (
+                        <span className="material-symbols-outlined text-[14px] text-primary">check</span>
+                      )}
+                    </div>
+                    <span className="text-[10px] text-slate-400 font-normal">{opt.desc}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* View Switcher Pill Dropdown (Graph View vs Tabular View) */}
+          <div className="relative inline-block">
+            <button
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white border border-slate-200 shadow-2xs text-primary font-label-md text-[11.5px] font-semibold hover:border-primary/50 transition-all cursor-pointer"
+              id="view-graph-btn"
+              type="button"
+              onClick={() => {
+                setIsViewDropdownOpen((prev) => !prev);
+                setIsFilterDropdownOpen(false);
+              }}
+            >
+              <span className="material-symbols-outlined text-[16px] text-primary" id="graph-view-icon">
+                {displayMode === 'graph' ? 'show_chart' : 'table_chart'}
+              </span>
+              <span id="current-graph-view-label">
+                {displayMode === 'graph' ? 'Graph View' : 'Tabular View'}
+              </span>
+              <span className={`material-symbols-outlined text-[15px] text-primary transition-transform duration-200 ${isViewDropdownOpen ? 'rotate-180' : ''}`}>
+                expand_more
+              </span>
+            </button>
+
+            {isViewDropdownOpen && (
+              <div className="absolute right-0 top-full mt-1.5 w-36 bg-white border border-slate-200 rounded-xl shadow-[0_4px_16px_rgba(0,0,0,0.08)] p-1 z-50 animate-in fade-in slide-in-from-top-1 duration-150">
                 <button
-                  className={`w-full flex items-center justify-between px-3 py-2 rounded-lg font-label-md text-[12px] text-left transition-colors cursor-pointer ${
-                    viewMode === 'graph'
+                  className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg font-label-md text-[11.5px] text-left transition-colors cursor-pointer ${
+                    displayMode === 'graph'
                       ? 'bg-slate-50 text-primary font-semibold'
-                      : 'text-on-surface-variant hover:bg-slate-50 hover:text-on-surface'
+                      : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
                   }`}
                   onClick={() => {
-                    setViewMode('graph');
-                    setIsDropdownOpen(false);
+                    setDisplayMode('graph');
+                    setIsViewDropdownOpen(false);
                   }}
                   type="button"
                 >
                   <span>Graph View</span>
-                  {viewMode === 'graph' && (
-                    <span className="material-symbols-outlined text-[15px]">check</span>
+                  {displayMode === 'graph' && (
+                    <span className="material-symbols-outlined text-[14px]">check</span>
                   )}
                 </button>
                 <button
-                  className={`w-full flex items-center justify-between px-3 py-2 rounded-lg font-label-md text-[12px] text-left transition-colors cursor-pointer ${
-                    viewMode === 'table'
+                  className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg font-label-md text-[11.5px] text-left transition-colors cursor-pointer ${
+                    displayMode === 'table'
                       ? 'bg-slate-50 text-primary font-semibold'
-                      : 'text-on-surface-variant hover:bg-slate-50 hover:text-on-surface'
+                      : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
                   }`}
                   onClick={() => {
-                    setViewMode('table');
-                    setIsDropdownOpen(false);
+                    setDisplayMode('table');
+                    setIsViewDropdownOpen(false);
                   }}
                   type="button"
                 >
                   <span>Tabular View</span>
-                  {viewMode === 'table' && (
-                    <span className="material-symbols-outlined text-[15px]">check</span>
+                  {displayMode === 'table' && (
+                    <span className="material-symbols-outlined text-[14px]">check</span>
                   )}
                 </button>
               </div>
             )}
           </div>
 
-          {/* Export CSV Button (Available in both Graphical and Tabular views) */}
+          {/* Export CSV Button */}
           <button
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100 text-on-surface font-label-sm text-label-sm hover:bg-slate-200 transition-colors cursor-pointer"
+            className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-slate-50 text-slate-700 hover:text-slate-900 font-label-sm text-[11.5px] font-medium border border-slate-200 hover:bg-slate-100 transition-colors cursor-pointer shadow-2xs"
             onClick={handleExportCSV}
             type="button"
+            title="Export dynamic observations stream as CSV"
           >
             <span className="material-symbols-outlined text-[15px] text-primary">download</span>
             <span>Export CSV</span>
@@ -158,22 +332,48 @@ export default function ObservationsSection({ onExportNotify }) {
       </div>
 
       {/* Graph Container Display */}
-      {viewMode === 'graph' && (
-        <div className="mt-4 flex flex-col" id="observation-graph-display">
-          <div className="flex items-start">
-            {/* Y-Axis Labels: 500 MHz to 18 GHz */}
-            <div className="flex flex-col justify-between h-64 text-right pr-3 font-label-sm text-[11px] text-outline select-none pb-5 shrink-0">
-              <span className="font-semibold text-on-surface-variant">Frequency (GHz)</span>
-              <span>18.0 GHz</span>
-              <span>13.6 GHz</span>
-              <span>9.3 GHz</span>
-              <span>4.9 GHz</span>
-              <span>0.5 GHz</span>
+      {displayMode === 'graph' && (
+        <div className="mt-4 flex flex-col w-full overflow-hidden" id="observation-graph-display">
+          <div className="flex items-start w-full border border-slate-200 rounded-xl bg-white overflow-hidden shadow-2xs">
+            {/* Synchronized Fixed Y-Axis SVG Ruler */}
+            <div className="shrink-0 select-none bg-slate-50 border-r border-slate-200">
+              <svg width="68" height={plotHeight} className="block">
+                <text
+                  x="60"
+                  y="13"
+                  textAnchor="end"
+                  className="text-[9px] font-sans font-bold fill-slate-600 uppercase tracking-wide"
+                >
+                  Freq (GHz)
+                </text>
+                {/* Y-Axis Grid Tick Values (Aligned to grid lines at 25, 61, 97, 133, 169, 205) */}
+                {[
+                  { ghz: 18.0, y: 25 },
+                  { ghz: 14.5, y: 61 },
+                  { ghz: 11.0, y: 97 },
+                  { ghz: 7.5, y: 133 },
+                  { ghz: 4.0, y: 169 },
+                  { ghz: 0.5, y: 205 },
+                ].map((tick) => (
+                  <g key={`y-tick-${tick.ghz}`}>
+                    <text
+                      x="56"
+                      y={tick.y}
+                      dominantBaseline="central"
+                      textAnchor="end"
+                      className="text-[10px] font-mono fill-slate-500 font-medium"
+                    >
+                      {tick.ghz.toFixed(1)}
+                    </text>
+                    <line x1="61" y1={tick.y} x2="68" y2={tick.y} stroke="#CBD5E1" strokeWidth="1" />
+                  </g>
+                ))}
+              </svg>
             </div>
 
-            {/* Pannable Graph Viewport */}
+            {/* Pannable & Scrollable Graph Viewport */}
             <div
-              className="relative flex-1 h-64 border-l border-b border-slate-300 bg-white rounded-tr-lg overflow-x-auto cursor-grab active:cursor-grabbing select-none"
+              className="relative flex-1 h-[230px] bg-white overflow-x-auto cursor-grab active:cursor-grabbing select-none"
               id="graph-pan-container"
               ref={sliderRef}
               onMouseDown={handleMouseDown}
@@ -181,104 +381,252 @@ export default function ObservationsSection({ onExportNotify }) {
               onMouseUp={handleMouseLeaveOrUp}
               onMouseMove={handleMouseMove}
             >
-              {/* Horizontal Gridlines */}
-              <div className="absolute inset-0 flex flex-col justify-between pointer-events-none w-[1000px]">
-                <div className="w-full border-t border-dashed border-slate-200"></div>
-                <div className="w-full border-t border-dashed border-slate-200"></div>
-                <div className="w-full border-t border-dashed border-slate-200"></div>
-                <div className="w-full border-t border-dashed border-slate-200"></div>
-                <div></div>
-              </div>
+              <svg
+                style={{ width: `${plotWidth}px`, height: `${plotHeight}px` }}
+                className="overflow-visible block"
+              >
+                {/* Horizontal Gridlines spanning plot width */}
+                <line x1="0" y1="25" x2={plotWidth} y2="25" stroke="#F1F5F9" strokeDasharray="3 3" strokeWidth="1" />
+                <line x1="0" y1="61" x2={plotWidth} y2="61" stroke="#F1F5F9" strokeDasharray="3 3" strokeWidth="1" />
+                <line x1="0" y1="97" x2={plotWidth} y2="97" stroke="#F1F5F9" strokeDasharray="3 3" strokeWidth="1" />
+                <line x1="0" y1="133" x2={plotWidth} y2="133" stroke="#F1F5F9" strokeDasharray="3 3" strokeWidth="1" />
+                <line x1="0" y1="169" x2={plotWidth} y2="169" stroke="#F1F5F9" strokeDasharray="3 3" strokeWidth="1" />
+                <line x1="0" y1="205" x2={plotWidth} y2="205" stroke="#E2E8F0" strokeWidth="1.5" />
 
-              {/* Vertical Gridlines */}
-              <div className="absolute inset-0 flex justify-between pointer-events-none w-[1000px]">
-                <div className="h-full border-r border-dashed border-slate-200"></div>
-                <div className="h-full border-r border-dashed border-slate-200"></div>
-                <div className="h-full border-r border-dashed border-slate-200"></div>
-                <div className="h-full border-r border-dashed border-slate-200"></div>
-                <div className="h-full border-r border-dashed border-slate-200"></div>
-                <div className="h-full border-r border-dashed border-slate-200"></div>
-                <div className="h-full border-r border-dashed border-slate-200"></div>
-              </div>
+                {/* Vertical Time Step Gridlines */}
+                {pts.map((pt) => (
+                  <line
+                    key={`v-grid-${pt.obs.id}`}
+                    x1={pt.midX}
+                    y1="20"
+                    x2={pt.midX}
+                    y2="205"
+                    stroke="#F8FAFC"
+                    strokeDasharray="2 3"
+                    strokeWidth="1"
+                  />
+                ))}
 
-              {/* Stepped Digital Signal SVG */}
-              <svg className="absolute inset-0 h-full w-[1000px]" preserveAspectRatio="none" viewBox="0 0 1000 200">
-                {/* Open Loop Scan Baseline (Grey dashed) */}
-                <path
-                  d="M 0,180 L 100,180 L 100,150 L 200,150 L 200,120 L 300,120 L 300,90 L 450,90 L 450,60 L 650,60 L 650,30 L 1000,30"
-                  fill="none"
-                  opacity="0.3"
-                  stroke="#94A3B8"
-                  strokeDasharray="4 4"
-                  strokeWidth="1.5"
-                />
-                {/* Adaptive ML Scan (DQN ε-Greedy) Stepped Line (Teal solid) */}
-                <path
-                  d="M 0,135 L 40,135 L 40,70 L 90,70 L 90,135 L 250,135 L 250,95 L 310,95 L 310,135 L 390,135 L 390,180 L 440,180 L 440,135 L 530,135 L 530,45 L 580,45 L 580,135 L 720,135 L 720,80 L 780,80 L 780,135 L 890,135 L 890,110 L 940,110 L 940,135 L 1000,135"
-                  fill="none"
-                  stroke="#006972"
-                  strokeLinecap="square"
-                  strokeWidth="2.5"
-                />
+                {/* Direct vertical lines connecting receiver band decisions (only when All or Both is active) */}
+                {verticalLines.map((vl) => (
+                  <line
+                    key={vl.id}
+                    x1={vl.x}
+                    y1={vl.y1}
+                    x2={vl.x}
+                    y2={vl.y2}
+                    stroke="#0F172A"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                  />
+                ))}
+
+                {/* Receiver Dwell Segments: Green (#10B981) for Interceptions, Yellow (#F59E0B) for Misses */}
+                {pts.map((pt) => {
+                  const isHit = pt.obs.isIntercepted;
+
+                  // Filter check: hide if filter excludes this observation type
+                  if (isHit && !showInterceptions) return null;
+                  if (!isHit && !showMisses) return null;
+
+                  const strokeColor = isHit ? '#10B981' : '#F59E0B';
+
+                  return (
+                    <g key={`dwell-group-${pt.obs.id}`}>
+                      {/* Full-width horizontal receiver dwell line */}
+                      <line
+                        x1={pt.startX}
+                        y1={pt.y}
+                        x2={pt.endX}
+                        y2={pt.y}
+                        stroke={strokeColor}
+                        strokeWidth="3.2"
+                        strokeLinecap="round"
+                      />
+                      <title>{`${pt.obs.timestamp} • Receiver Scan: ${pt.obs.band} (${pt.obs.centerFreq}) • Rx: ${pt.obs.status}${isHit ? ' (CAUGHT TARGET)' : ''}`}</title>
+                    </g>
+                  );
+                })}
+
+                {/* Actual Emission Markers (Environmental View only: Consistent Solid Filled Emerald Diamonds) */}
+                {showActualEmissions &&
+                  pts.map((pt) => (
+                    <g key={`actual-emissions-group-${pt.obs.id}`}>
+                      {pt.emissions.map((em, idx) => {
+                        const isCaughtHere = pt.obs.isIntercepted && pt.obs.bandId === em.bandId;
+
+                        return (
+                          <g key={`em-marker-${pt.obs.id}-${em.bandId}-${idx}`}>
+                            {/* Solid filled diamond reticle consistent with the legend */}
+                            <polygon
+                              points={`${pt.midX},${em.y - 5} ${pt.midX + 5},${em.y} ${pt.midX},${em.y + 5} ${pt.midX - 5},${em.y}`}
+                              fill="#10B981"
+                              stroke="#FFFFFF"
+                              strokeWidth="1.2"
+                              className="drop-shadow-[0_0_5px_rgba(16,185,129,0.85)]"
+                            />
+                            <title>{`${pt.obs.timestamp} • Target Emission: Band ${em.bandId} (${em.freqStr || em.freqGhz + ' GHz'})${isCaughtHere ? ' • [CAUGHT BY RECEIVER]' : ' • [UNMONITORED]'}`}</title>
+                          </g>
+                        );
+                      })}
+                    </g>
+                  ))}
+
+                {/* Leading Edge Cursor (Current Microsecond Position) */}
+                {cursorX > 0 && (
+                  <g>
+                    <line
+                      x1={cursorX}
+                      y1="20"
+                      x2={cursorX}
+                      y2="205"
+                      stroke="#94A3B8"
+                      strokeWidth="1.5"
+                      strokeDasharray="3 2"
+                    />
+                    <circle cx={cursorX} cy="20" r="2.5" fill="#94A3B8" />
+                  </g>
+                )}
+
+                {/* X-Axis Microsecond Time Ticks */}
+                {pts.map((pt) => (
+                  <text
+                    key={`time-tick-${pt.obs.id}`}
+                    x={pt.midX}
+                    y="222"
+                    textAnchor="middle"
+                    className="text-[9.5px] font-mono fill-slate-500 font-semibold select-none"
+                  >
+                    {pt.obs.timeUs} µs
+                  </text>
+                ))}
               </svg>
 
-              {/* Vertical Time Indicator (Cursor line at t=528s) */}
-              <div className="absolute left-[780px] top-0 bottom-0 w-[1.5px] bg-primary">
-                <div className="absolute -top-1 -translate-x-1/2 font-label-sm text-[9px] bg-primary text-white px-1.5 py-0.5 rounded shadow-xs whitespace-nowrap">
-                  t=528s
+              {/* Standby Message if no observations accumulated yet */}
+              {observations.length === 0 && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-400 gap-1.5 select-none pointer-events-none">
+                  <span className="material-symbols-outlined text-[24px] text-slate-300">timeline</span>
+                  <span className="text-[12px] font-medium">Awaiting scan steps to plot timeline...</span>
                 </div>
-              </div>
+              )}
             </div>
           </div>
 
-          {/* X-Axis Time Labels */}
-          <div className="flex justify-between pl-24 sm:pl-28 pt-2 font-label-sm text-[11px] text-outline select-none">
-            <span>0 s</span>
-            <span>150 s</span>
-            <span className="font-semibold text-on-surface-variant">Time (s)</span>
-            <span>300 s</span>
-            <span>450 s</span>
-            <span>600 s</span>
+          {/* Graph Footer Bar: Interaction tip with subtle reduced-size icon and clear visual legend */}
+          <div className="flex flex-wrap items-center justify-between gap-2.5 pt-3 border-t border-slate-100 mt-2 text-[11px] text-slate-500 select-none">
+            <div className="flex items-center gap-1.5">
+              <span className="material-symbols-outlined text-[11px] text-slate-400">info</span>
+              <span>
+                Horizontal drag or scroll to review recorded scan observations.
+              </span>
+            </div>
+
+            {/* Dynamic Visual Legend reflecting current filter and viewMode */}
+            <div className="flex flex-wrap items-center gap-4">
+              {showInterceptions && (
+                <div className="flex items-center gap-1.5">
+                  <span className="w-4 h-1 rounded bg-[#10B981]" />
+                  <span className="text-emerald-700 font-bold">Intercepted (Hit)</span>
+                </div>
+              )}
+              {showMisses && (
+                <div className="flex items-center gap-1.5">
+                  <span className="w-4 h-1 rounded bg-[#F59E0B]" />
+                  <span className="text-amber-700 font-medium">Miss (Searching)</span>
+                </div>
+              )}
+              {showActualEmissions && (
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2.5 h-2.5 rotate-45 bg-[#10B981] border border-white shadow-2xs" />
+                  <span className="text-emerald-800 font-bold">Actual Target Emission</span>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
 
       {/* Tabular View Container */}
-      {viewMode === 'table' && (
-        <div className="mt-4 overflow-x-auto" id="observation-table-display">
-          <table className="w-full text-left text-xs font-label-sm border-collapse min-w-[640px]">
-            <thead className="bg-slate-50 border-b border-slate-200">
-              <tr>
-                <th className="py-2.5 px-3 text-outline font-semibold">Timestamp</th>
-                <th className="py-2.5 px-3 text-outline font-semibold">Frequency Band</th>
-                <th className="py-2.5 px-3 text-outline font-semibold">Center Freq</th>
-                <th className="py-2.5 px-3 text-outline font-semibold">Signal Type</th>
-                <th className="py-2.5 px-3 text-outline font-semibold">Duration</th>
-                <th className="py-2.5 px-3 text-outline font-semibold">Rx Status</th>
-                <th className="py-2.5 px-3 text-outline font-semibold text-right">Confidence</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 text-on-surface font-mono text-[11px]">
-              {DEFAULT_OBSERVATIONS.map((row) => (
-                <tr key={row.id} className="hover:bg-slate-50/70 transition-colors">
-                  <td className="py-2 px-3">{row.timestamp}</td>
-                  <td className="py-2 px-3 font-semibold text-primary">{row.band}</td>
-                  <td className="py-2 px-3">{row.centerFreq}</td>
-                  <td className="py-2 px-3">{row.signalType}</td>
-                  <td className="py-2 px-3">{row.duration}</td>
-                  <td className="py-2 px-3">
-                    <span className="px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 text-[10px] font-medium border border-emerald-200">
-                      {row.status}
-                    </span>
-                  </td>
-                  <td className="py-2 px-3 text-right">{row.confidence}</td>
+      {displayMode === 'table' && (
+        <div className="mt-4 flex flex-col w-full overflow-hidden" id="observation-table-display">
+          {/* Subtitle note on table */}
+          <div className="pb-2 text-[11px] text-slate-500 flex items-center justify-between">
+            <span>
+              Recorded observations stream ({filteredObservations.length} of {observations.length} total entries)
+            </span>
+            <span className="font-mono text-[10px] text-slate-400">Newest events displayed first</span>
+          </div>
+
+          {/* Scrollable table container */}
+          <div className="max-h-[340px] overflow-y-auto overflow-x-auto rounded-xl border border-slate-200 shadow-2xs">
+            <table className="w-full text-left text-xs font-label-sm border-collapse min-w-[550px]">
+              <thead className="bg-slate-50 border-b border-slate-200 sticky top-0 z-10 shadow-2xs">
+                <tr>
+                  <th className="py-2.5 px-3.5 text-slate-600 font-bold uppercase tracking-wider text-[10.5px]">Time (µs)</th>
+                  <th className="py-2.5 px-3.5 text-slate-600 font-bold uppercase tracking-wider text-[10.5px]">Scheduled Band</th>
+                  <th className="py-2.5 px-3.5 text-slate-600 font-bold uppercase tracking-wider text-[10.5px]">Intercepted Frequency</th>
+                  {viewMode === 'environment' && (
+                    <th className="py-2.5 px-3.5 text-emerald-800 font-bold uppercase tracking-wider text-[10.5px]">Actual Emission(s)</th>
+                  )}
+                  <th className="py-2.5 px-3.5 text-slate-600 font-bold uppercase tracking-wider text-[10.5px]">Frequency Range</th>
+                  <th className="py-2.5 px-3.5 text-slate-600 font-bold uppercase tracking-wider text-[10.5px]">Rx Status</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-slate-100 text-on-surface font-mono text-[11px]">
+                {filteredObservations.length > 0 ? (
+                  [...filteredObservations].reverse().map((row) => (
+                    <tr key={row.id} className="hover:bg-slate-50/80 transition-colors">
+                      <td className="py-2.5 px-3.5 font-bold text-slate-900">{row.timestamp}</td>
+                      <td className="py-2.5 px-3.5 font-semibold text-primary">{row.band}</td>
+                      <td className="py-2.5 px-3.5">
+                        {row.isIntercepted ? (
+                          <span className="font-bold text-emerald-700 font-mono text-[11px]">
+                            {row.interceptedFreq || row.centerFreq}
+                          </span>
+                        ) : (
+                          <span className="text-slate-400 font-mono text-[11px]">-</span>
+                        )}
+                      </td>
+                      {viewMode === 'environment' && (
+                        <td className="py-2.5 px-3.5 text-emerald-800 font-semibold text-[10.5px]">
+                          {row.actualEmissions && row.actualEmissions.length > 0 ? (
+                            row.actualEmissions.map((em, idx) => (
+                              <span key={`em-${row.id}-${em.bandId}-${idx}`}>
+                                {idx > 0 && <span className="text-slate-400 mx-1">•</span>}
+                                Band {em.bandId} <span className="text-emerald-700/80 font-normal">({em.freqStr})</span>
+                              </span>
+                            ))
+                          ) : (
+                            row.actualFreqStr || '-'
+                          )}
+                        </td>
+                      )}
+                      <td className="py-2.5 px-3.5 text-slate-500 text-[10.5px]">{row.range}</td>
+                      <td className="py-2.5 px-3.5">
+                        {row.isIntercepted ? (
+                          <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 font-bold text-[10px] border border-emerald-200 tracking-wide uppercase shadow-2xs">
+                            INTERCEPTED (HIT)
+                          </span>
+                        ) : (
+                          <span className="px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 font-medium text-[10px] border border-amber-200 tracking-wide uppercase">
+                            SEARCHING (MISS)
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={viewMode === 'environment' ? 6 : 5} className="py-10 text-center text-slate-400 font-sans text-xs">
+                      No observations matching the selected filter ({currentFilterMeta.label}).
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
     </div>
   );
 }
-
