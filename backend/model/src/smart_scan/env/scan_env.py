@@ -95,9 +95,7 @@ class ScanEnvironment:
             raise ValueError("reward weights cannot be negative")
         self.seed = seed
         self.rng = np.random.default_rng(seed)
-        self.next_pulse_predictor = NextPulsePredictor(
-            episode.num_emitters, episode.num_bands
-        )
+        self.next_pulse_predictor = NextPulsePredictor(episode.num_bands)
         self.reset()
 
     def reset(self) -> np.ndarray:
@@ -137,9 +135,7 @@ class ScanEnvironment:
         self.action_log: list[int] = []
         self.reward_log: list[float] = []
         self.rng = np.random.default_rng(self.seed)
-        self.next_pulse_predictor = NextPulsePredictor(
-            self.episode.num_emitters, self.episode.num_bands
-        )
+        self.next_pulse_predictor = NextPulsePredictor(self.episode.num_bands)
         return self.state_vector()
 
     @property
@@ -393,7 +389,10 @@ class ScanEnvironment:
         self.total_dead_time_s += min(dead_time_s, self.episode.time_bin_s)
         self.action_log.append(action)
         self.reward_log.append(float(reward))
-        self.next_pulse_predictor.update(event_times, event_bands, event_emitters)
+        # The prediction feature uses only observed times and bands. Dataset
+        # emitter identities remain simulator truth for reward/evaluation and
+        # never enter the contextual feature path.
+        self.next_pulse_predictor.update(event_times, event_bands)
         self.step_index += 1
         return Transition(
             reward=float(reward),

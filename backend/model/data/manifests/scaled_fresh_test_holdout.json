@@ -1,0 +1,16 @@
+{
+  "dataset_id": "alan-turing-institute/turing-synthetic-radar-dataset",
+  "description": "Sealed post-reward holdout. Do not download, inspect, preprocess, or evaluate test IDs 17-26 until LinUCB training and validation selection are frozen.",
+  "files": [
+    {"split": "test", "mode": "stare", "config_id": 17},
+    {"split": "test", "mode": "stare", "config_id": 18},
+    {"split": "test", "mode": "stare", "config_id": 19},
+    {"split": "test", "mode": "stare", "config_id": 20},
+    {"split": "test", "mode": "stare", "config_id": 21},
+    {"split": "test", "mode": "stare", "config_id": 22},
+    {"split": "test", "mode": "stare", "config_id": 23},
+    {"split": "test", "mode": "stare", "config_id": 24},
+    {"split": "test", "mode": "stare", "config_id": 25},
+    {"split": "test", "mode": "stare", "config_id": 26}
+  ]
+}

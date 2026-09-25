@@ -21,3 +21,6 @@ def test_scaled_configuration_enables_adaptive_coverage() -> None:
     assert dqn["min_revisit_factor"] == 0.5
     assert dqn["max_revisit_factor"] == 3.0
     assert dqn["coverage_bonus_weight"] == 0.5
+    from smart_scan.config import linucb_kwargs
+
+    assert linucb_kwargs(payload)["shared_model"] is True

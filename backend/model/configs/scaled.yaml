@@ -24,6 +24,9 @@ linucb:
   max_revisit_factor: 3.0
   uncertainty_weight: 0.75
   coverage_bonus_weight: 1.0
+  # One shared model learns generic observable activity rules rather than
+  # memorizing which absolute frequency bands were active in training.
+  shared_model: true
 dqn:
   hidden_size: 128
   replay_capacity: 200000

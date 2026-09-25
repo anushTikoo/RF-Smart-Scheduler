@@ -6,6 +6,8 @@ The system treats stare-mode recordings from the Turing Synthetic Radar Dataset 
 
 The cache keeps both time-band aggregates and exact pulse times. Exact events are used for amplitude thresholding, configurable decision/retune/settling latency, and online next-pulse prediction. The 5 ms dwell is a scheduling time step, not a claim that the Python prototype makes a hardware decision between two pulses a few microseconds apart. Real-time feasibility must later be measured on the target receiver/FPGA/processor with non-zero latency configured in `configs/micro.yaml`.
 
+The active LinUCB scheduler requires no emitter identity, emitter class, PRI, scan pattern, or pre-mission frequency plan. Its context is built only from receiver-observable per-band history: visit recency, hit EWMA, pulse count, amplitude, consecutive no-hit observations, anonymously inferred band periodicity, anonymous band-activity prediction, switching distance, uncertainty, coverage urgency, and time. Dataset emitter labels remain simulator truth for offline reward and evaluation only. Frozen validation/test inference does not update from oracle rewards.
+
 ## Setup
 
 ```powershell
@@ -90,6 +92,36 @@ Do not download, preprocess, inspect, or evaluate `scaled_test_holdout.json` unt
 The scaled configuration enables activity-aware revisit deadlines and a coverage-urgency bonus. It retains an initial full-band visit and a hard deadline guard, while allowing repeatedly inactive bands to wait longer and active, uncertain, or pulse-due bands to be revisited sooner.
 
 Emitter labels are retained in processed episode caches because they are required to score unique-emitter coverage, first-intercept delay, and emitter-event interception. Labels are local to each scenario and are evaluator/reward-only: they are never placed in the scheduler state, contextual-bandit context, or DQN input.
+
+## Persistent LinUCB train/validation/test pipeline
+
+Train every candidate continuously across all 30 training scenarios, evaluate the resulting frozen checkpoints on the 10 validation scenarios, and freeze the best validation configuration:
+
+```powershell
+.venv\Scripts\python scripts/linucb_train_validate.py
+```
+
+The compact candidate search is declared in `configs/linucb_search.yaml`. Selection maximizes validation reward, with pulse interception and lower first-intercept delay used only as tie-breakers. The command produces:
+
+- `outputs/linucb_pipeline/frozen_linucb.npz`
+- `outputs/linucb_pipeline/frozen_config.yaml`
+- `outputs/linucb_pipeline/selection.json`
+
+Only after those files are frozen, download and preprocess the new sealed test scenarios 17–26:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/download_micro_dataset.ps1 `
+  -Manifest data/manifests/scaled_fresh_test_holdout.json `
+  -RawDirectory data/raw
+smart-scan preprocess `
+  --manifest data/manifests/scaled_fresh_test_holdout.json `
+  --raw data/raw `
+  --output data/processed `
+  --config outputs/linucb_pipeline/frozen_config.yaml
+.venv\Scripts\python scripts/linucb_final_test.py
+```
+
+The final-test command loads the frozen checkpoint with online updates disabled and compares only round-robin and LinUCB. See `LINUCB_TRAINING_PIPELINE.md` for the data-boundary and checkpoint details.
 
 Generate the named interception figures of merit from an aggregate result:
 

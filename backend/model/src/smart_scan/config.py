@@ -85,6 +85,7 @@ def linucb_kwargs(payload: dict[str, Any]) -> dict[str, Any]:
         "min_revisit_factor",
         "uncertainty_weight",
         "coverage_bonus_weight",
+        "shared_model",
     }
     result = {key: values[key] for key in allowed if key in values}
     if "max_revisit_factor" not in result:
