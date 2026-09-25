@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Header from './components/Header';
-import RadarScanner from './components/RadarScanner';
+import RadarScanner, { BAND_CONFIG } from './components/RadarScanner';
 import ObservationsSection from './components/ObservationsSection';
 import RLParametersAccordion from './components/RLParametersAccordion';
 import Toast from './components/Toast';
@@ -13,11 +13,17 @@ export default function App() {
   const [loadedDataset, setLoadedDataset] = useState(null);
   const [toastMessage, setToastMessage] = useState(null);
 
+  // Dynamic observations stream for Adaptive ML Scan
+  const [observations, setObservations] = useState([]);
+  const timeUsRef = useRef(0);
+  const obsIdRef = useRef(0);
+
   // Radar Scanner & Telemetry states (backend-connected / real-time streaming)
   const [telemetrySource, setTelemetrySource] = useState('initializing');
   const [mlCurrentBand, setMlCurrentBand] = useState(null);
   const [openLoopCurrentBand, setOpenLoopCurrentBand] = useState(null);
   const [actualEmissionBand, setActualEmissionBand] = useState(null);
+  const [actualEmissionBands, setActualEmissionBands] = useState([]);
   const [emissionFrequency, setEmissionFrequency] = useState(null);
   const [mlInterceptedFreq, setMlInterceptedFreq] = useState(null);
   const [openLoopInterceptedFreq, setOpenLoopInterceptedFreq] = useState(null);
@@ -53,6 +59,10 @@ export default function App() {
 
       if (snapshot.environment) {
         setActualEmissionBand(snapshot.environment.actualEmissionBand);
+        setActualEmissionBands(
+          snapshot.environment.actualEmissionBands ||
+          (snapshot.environment.actualEmissionBand ? [snapshot.environment.actualEmissionBand] : [])
+        );
         if (snapshot.environment.emissionFrequency) {
           setEmissionFrequency(snapshot.environment.emissionFrequency);
         }
@@ -63,6 +73,58 @@ export default function App() {
         setMlInterceptedFreq(snapshot.adaptive.interceptedFrequency);
         if (snapshot.adaptive.metrics) {
           setMlMetrics(snapshot.adaptive.metrics);
+        }
+
+        // Dynamically append observation for Adaptive ML Scan
+        const bandId = snapshot.adaptive.currentBand;
+        if (bandId) {
+          const bConf = (BAND_CONFIG && BAND_CONFIG.find(b => b.id === bandId)) || {
+            id: bandId,
+            center: `${(0.5 + bandId * 0.875).toFixed(2)} GHz`,
+            range: `Band ${bandId}`,
+          };
+          const isHit = Boolean(snapshot.adaptive.isIntercepted);
+          timeUsRef.current += 150; // increments in microseconds (150 µs per scan dwell)
+          obsIdRef.current += 1;
+
+          // Parse actual emission frequencies (support single and multiple simultaneous emissions)
+          const envBands = snapshot.environment?.actualEmissionBands || (snapshot.environment?.actualEmissionBand ? [snapshot.environment.actualEmissionBand] : []);
+          const emissionsList = snapshot.environment?.emissions || envBands.map((bId) => {
+            const c = BAND_CONFIG.find(b => b.id === bId);
+            return { bandId: bId, freq: c ? c.center : '', type: '' };
+          });
+          const actualEmissionsData = emissionsList.map((e) => ({
+            bandId: e.bandId,
+            freqStr: e.freq,
+            freqGhz: parseFloat(e.freq) || (BAND_CONFIG.find(b => b.id === e.bandId) ? parseFloat(BAND_CONFIG.find(b => b.id === e.bandId).center) : null),
+            type: e.type,
+          }));
+
+          let scanFreq = parseFloat(bConf.center);
+          if (isHit && snapshot.adaptive.interceptedFrequency) {
+            scanFreq = parseFloat(snapshot.adaptive.interceptedFrequency);
+          }
+
+          setObservations((prev) => {
+            const newEntry = {
+              id: obsIdRef.current,
+              timeUs: timeUsRef.current,
+              timestamp: `${timeUsRef.current} µs`,
+              band: `Band ${bandId}`,
+              bandId: bandId,
+              centerFreq: bConf.center,
+              interceptedFreq: isHit ? (snapshot.adaptive.interceptedFrequency || bConf.center) : '-',
+              range: bConf.range,
+              freqGhz: scanFreq || (0.5 + bandId * 0.875),
+              status: isHit ? 'INTERCEPTED' : 'MISS',
+              isIntercepted: isHit,
+              actualBands: envBands,
+              actualBand: envBands.length > 0 ? envBands[0] : null,
+              actualEmissions: actualEmissionsData,
+              actualFreqStr: snapshot.environment?.emissionFrequency || (actualEmissionsData.length > 0 ? actualEmissionsData.map(e => e.freqStr).join(', ') : '-'),
+            };
+            return [...prev, newEntry].slice(-60);
+          });
         }
       }
 
@@ -89,6 +151,9 @@ export default function App() {
 
   const handleDatasetUpload = (file) => {
     setLoadedDataset(file);
+    setObservations([]);
+    timeUsRef.current = 0;
+    obsIdRef.current = 0;
     setIsScanning(true); // Automatically starts running after uploading a dataset
     showToast(`Dataset loaded: ${file.name}. Starting cognitive RF scan scheduler...`);
   };
@@ -106,9 +171,13 @@ export default function App() {
   const handleClearSimulation = () => {
     setLoadedDataset(null);
     setIsScanning(false);
+    setObservations([]);
+    timeUsRef.current = 0;
+    obsIdRef.current = 0;
     setMlCurrentBand(null);
     setOpenLoopCurrentBand(null);
     setActualEmissionBand(null);
+    setActualEmissionBands([]);
     setEmissionFrequency(null);
     setMlInterceptedFreq(null);
     setOpenLoopInterceptedFreq(null);
@@ -175,6 +244,17 @@ export default function App() {
                 </span>
               </div>
 
+              {/* Band Bins Configuration Pill */}
+              <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-50 border border-slate-200/90 text-slate-600 select-none">
+                <span className="material-symbols-outlined text-[15px] text-primary">view_column</span>
+                <span className="font-label-sm text-[10.5px] uppercase text-slate-500 font-semibold tracking-wide">
+                  Band Bins:
+                </span>
+                <span className="font-mono text-[11px] font-bold text-slate-800">
+                  20 Channels (875 MHz)
+                </span>
+              </div>
+
               {/* Pause / Resume Simulation Button */}
               <button
                 onClick={handleTogglePause}
@@ -215,6 +295,7 @@ export default function App() {
             viewMode={viewMode}
             currentBand={mlCurrentBand}
             actualEmissionBand={actualEmissionBand}
+            actualEmissionBands={actualEmissionBands}
             emissionFrequency={emissionFrequency}
             interceptedFrequency={mlInterceptedFreq}
             metrics={mlMetrics}
@@ -229,6 +310,7 @@ export default function App() {
             viewMode={viewMode}
             currentBand={openLoopCurrentBand}
             actualEmissionBand={actualEmissionBand}
+            actualEmissionBands={actualEmissionBands}
             emissionFrequency={emissionFrequency}
             interceptedFrequency={openLoopInterceptedFreq}
             metrics={openLoopMetrics}
@@ -239,7 +321,15 @@ export default function App() {
 
         {/* Bottom Section: Observations Graph/Table (Hidden until dataset is uploaded) & RL Parameters Accordion */}
         <div className="flex flex-col gap-6">
-          {loadedDataset && <ObservationsSection onExportNotify={showToast} />}
+          {loadedDataset && (
+            <ObservationsSection
+              observations={observations}
+              isScanning={isScanning}
+              hasDataset={!!loadedDataset}
+              viewMode={viewMode}
+              onExportNotify={showToast}
+            />
+          )}
           <RLParametersAccordion />
         </div>
       </main>

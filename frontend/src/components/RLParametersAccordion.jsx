@@ -21,9 +21,6 @@ export default function RLParametersAccordion() {
         </div>
 
         <div className="flex items-center gap-2">
-          <span className="text-xs text-outline font-label-sm hidden sm:inline">
-            DQN ε-Greedy Engine
-          </span>
           <span
             className={`material-symbols-outlined text-[20px] text-outline transition-transform duration-200 ${
               isExpanded ? 'rotate-180' : ''
@@ -44,7 +41,11 @@ export default function RLParametersAccordion() {
           <div className="grid grid-cols-2 md:grid-cols-3 gap-x-8 gap-y-3 font-label-sm text-[12px]">
             <div className="flex justify-between py-1 border-b border-slate-100">
               <span className="text-outline">Algorithm:</span>
-              <span className="font-semibold text-primary">DQN (ε-greedy)</span>
+              <span className="font-semibold text-primary">Contextual Bandit (ε-greedy)</span>
+            </div>
+            <div className="flex justify-between py-1 border-b border-slate-100">
+              <span className="text-outline">Context:</span>
+              <span className="font-semibold text-on-surface">Spectral History & Activity State</span>
             </div>
             <div className="flex justify-between py-1 border-b border-slate-100">
               <span className="text-outline">Exploration (ε):</span>
@@ -52,21 +53,15 @@ export default function RLParametersAccordion() {
             </div>
             <div className="flex justify-between py-1 border-b border-slate-100">
               <span className="text-outline">Current Reward:</span>
-              <span className="font-semibold text-primary">+1.0 per Intercept</span>
+              <span className="font-semibold text-on-surface">+1.0 per Intercept</span>
             </div>
             <div className="flex justify-between py-1 border-b border-slate-100">
-              <span className="text-outline">Simulation Time:</span>
-              <span className="font-semibold text-on-surface font-telemetry-metric">
-                00:12:34
-              </span>
+              <span className="text-outline">Action Space:</span>
+              <span className="font-semibold text-on-surface">20 Band Arms (0.5 – 18 GHz)</span>
             </div>
             <div className="flex justify-between py-1 border-b border-slate-100">
               <span className="text-outline">Inference Delay:</span>
               <span className="font-semibold text-on-surface">12 ms</span>
-            </div>
-            <div className="flex justify-between py-1 border-b border-slate-100">
-              <span className="text-outline">Band Bins:</span>
-              <span className="font-semibold text-on-surface">20 Channels (875 MHz)</span>
             </div>
           </div>
         </div>

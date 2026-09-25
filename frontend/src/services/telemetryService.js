@@ -59,22 +59,76 @@ export function subscribeTelemetry(onUpdate, intervalMs = 1400) {
   let ws = null;
   let timer = null;
 
-  // Realistic simulation sequence representing cognitive environment
+  // Realistic simulation sequence representing cognitive environment with single and simultaneous multi-emitter cases
   const emitterSequence = [
-    { bandId: 14, freq: '12.31 GHz', type: 'Pulsed Radar (Ku-Band)' },
-    { bandId: 14, freq: '12.28 GHz', type: 'Target Tracking Radar' },
-    { bandId: 18, freq: '15.81 GHz', type: 'Frequency Agility Chirp' },
-    { bandId: 4,  freq: '3.56 GHz',  type: 'Phased Array Acquisition' },
-    { bandId: 14, freq: '12.31 GHz', type: 'Pulsed Radar (Ku-Band)' },
-    { bandId: 8,  freq: '7.06 GHz',  type: 'Airborne Early Warning' },
-    { bandId: 12, freq: '10.56 GHz', type: 'Fire Control Radar' },
-    { bandId: 16, freq: '14.06 GHz', type: 'Airborne Early Warning' },
-    { bandId: 14, freq: '12.34 GHz', type: 'Pulsed Radar (Ku-Band)' },
-    { bandId: 6,  freq: '5.31 GHz',  type: 'Fire Control Radar' },
+    // Step 0: Single Ku-Band emitter
+    {
+      emissions: [
+        { bandId: 14, freq: '12.31 GHz', type: 'Pulsed Radar (Ku-Band)' },
+      ],
+    },
+    // Step 1: Simultaneous emitters: Target Tracking (B14) + Air Search (B7)
+    {
+      emissions: [
+        { bandId: 14, freq: '12.28 GHz', type: 'Target Tracking Radar' },
+        { bandId: 7,  freq: '6.19 GHz',  type: 'Air Search Radar (C-Band)' },
+      ],
+    },
+    // Step 2: Single agile chirp emitter
+    {
+      emissions: [
+        { bandId: 18, freq: '15.81 GHz', type: 'Frequency Agility Chirp' },
+      ],
+    },
+    // Step 3: Simultaneous emitters: Phased Array (B4) + X-Band Fire Control (B11)
+    {
+      emissions: [
+        { bandId: 4,  freq: '3.56 GHz',  type: 'Phased Array Acquisition' },
+        { bandId: 11, freq: '9.69 GHz',  type: 'X-Band Fire Control' },
+      ],
+    },
+    // Step 4: Single Ku-Band emitter
+    {
+      emissions: [
+        { bandId: 14, freq: '12.31 GHz', type: 'Pulsed Radar (Ku-Band)' },
+      ],
+    },
+    // Step 5: Single Airborne Early Warning emitter
+    {
+      emissions: [
+        { bandId: 8,  freq: '7.06 GHz',  type: 'Airborne Early Warning' },
+      ],
+    },
+    // Step 6: Simultaneous emitters: Fire Control (B12) + Electronic Warfare Jammer (B19)
+    {
+      emissions: [
+        { bandId: 12, freq: '10.56 GHz', type: 'Fire Control Radar' },
+        { bandId: 19, freq: '16.69 GHz', type: 'Electronic Warfare Jammer' },
+      ],
+    },
+    // Step 7: Single Airborne Early Warning emitter
+    {
+      emissions: [
+        { bandId: 16, freq: '14.06 GHz', type: 'Airborne Early Warning' },
+      ],
+    },
+    // Step 8: Single Ku-Band emitter
+    {
+      emissions: [
+        { bandId: 14, freq: '12.34 GHz', type: 'Pulsed Radar (Ku-Band)' },
+      ],
+    },
+    // Step 9: Simultaneous emitters: Fire Control (B6) + Ku-Band Radar (B14)
+    {
+      emissions: [
+        { bandId: 6,  freq: '5.31 GHz',  type: 'Fire Control Radar' },
+        { bandId: 14, freq: '12.31 GHz', type: 'Pulsed Radar (Ku-Band)' },
+      ],
+    },
   ];
 
-  // Cognitive ML Agent scheduling decisions
-  const mlDecisions = [14, 14, 18, 4, 14, 8, 12, 16, 14, 6];
+  // Cognitive ML Agent scheduling decisions (realistic mix of hits and exploratory misses)
+  const mlDecisions = [14, 11, 18, 4, 5, 8, 12, 15, 14, 2];
 
   let step = 0;
   let openLoopBand = 7;
@@ -96,25 +150,33 @@ export function subscribeTelemetry(onUpdate, intervalMs = 1400) {
     step = (step + 1) % emitterSequence.length;
     openLoopBand = (openLoopBand % 20) + 1;
 
-    const currentEmission = emitterSequence[step];
+    const currentStep = emitterSequence[step];
+    const activeEmissions = currentStep.emissions;
+    const activeBandIds = activeEmissions.map((e) => e.bandId);
+
     const mlBand = mlDecisions[step];
 
-    const mlIntercepted = mlBand === currentEmission.bandId;
-    const openLoopIntercepted = openLoopBand === currentEmission.bandId;
+    // Check if ML receiver intercepted ANY of the active emissions
+    const mlMatchedEmission = activeEmissions.find((e) => e.bandId === mlBand);
+    const mlIntercepted = Boolean(mlMatchedEmission);
+
+    // Check if Open Loop receiver intercepted ANY of the active emissions
+    const openLoopMatchedEmission = activeEmissions.find((e) => e.bandId === openLoopBand);
+    const openLoopIntercepted = Boolean(openLoopMatchedEmission);
 
     if (mlIntercepted) {
       mlStats.totalHits += 1;
     } else {
       mlStats.totalMisses += 1;
     }
-    mlStats.totalActualEmissions += 1;
+    mlStats.totalActualEmissions += activeEmissions.length;
 
     if (openLoopIntercepted) {
       openLoopStats.totalHits += 1;
     } else {
       openLoopStats.totalMisses += 1;
     }
-    openLoopStats.totalActualEmissions += 1;
+    openLoopStats.totalActualEmissions += activeEmissions.length;
 
     const mlHitRateVal = (mlStats.totalHits / (mlStats.totalHits + mlStats.totalMisses)) * 100;
     const mlProbVal = (mlStats.totalHits / mlStats.totalActualEmissions) * 100;
@@ -126,14 +188,17 @@ export function subscribeTelemetry(onUpdate, intervalMs = 1400) {
       source: 'simulation',
       timestamp: Date.now(),
       environment: {
-        actualEmissionBand: currentEmission.bandId,
-        emissionFrequency: currentEmission.freq,
-        signalType: currentEmission.type,
+        actualEmissionBand: activeEmissions[0].bandId,
+        actualEmissionBands: activeBandIds,
+        emissionFrequency: activeEmissions.map((e) => e.freq).join(', '),
+        emissionFrequencies: activeEmissions.map((e) => e.freq),
+        signalType: activeEmissions.map((e) => e.type).join(' | '),
+        emissions: activeEmissions,
       },
       adaptive: {
         currentBand: mlBand,
         isIntercepted: mlIntercepted,
-        interceptedFrequency: mlIntercepted ? currentEmission.freq : null,
+        interceptedFrequency: mlIntercepted ? mlMatchedEmission.freq : null,
         metrics: {
           interceptRate: `${(0.70 + Math.random() * 0.05).toFixed(2)} /s`,
           hitRate: `${mlHitRateVal.toFixed(1)}%`,
@@ -148,7 +213,7 @@ export function subscribeTelemetry(onUpdate, intervalMs = 1400) {
       openLoop: {
         currentBand: openLoopBand,
         isIntercepted: openLoopIntercepted,
-        interceptedFrequency: openLoopIntercepted ? currentEmission.freq : null,
+        interceptedFrequency: openLoopIntercepted ? openLoopMatchedEmission.freq : null,
         metrics: {
           interceptRate: `${(0.23 + Math.random() * 0.03).toFixed(2)} /s`,
           hitRate: `${openLoopHitRateVal.toFixed(1)}%`,
@@ -182,4 +247,3 @@ export function subscribeTelemetry(onUpdate, intervalMs = 1400) {
     if (timer) clearInterval(timer);
   };
 }
-

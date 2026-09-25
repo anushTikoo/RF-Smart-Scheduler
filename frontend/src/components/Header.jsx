@@ -9,6 +9,68 @@ const WAVING_FLAG_SOURCES = [
   "/india-flag.png"
 ];
 
+// Receiver Radio Wave Sensor Icon with static center dot and animated radiating wave curves
+function ReceiverWaveIcon({ className = "w-[17px] h-[17px]" }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className={`shrink-0 overflow-visible ${className}`}
+      fill="none"
+      stroke="currentColor"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      {/* Central static receiver dot (never animates, perfectly stationary) */}
+      <circle cx="12" cy="12" r="2.2" fill="currentColor" stroke="none" />
+
+      {/* Inner wave arcs - ripples with headroom in 24x24 viewBox */}
+      <g className="receiver-wave-inner" strokeWidth="1.6">
+        <path d="M 8.8 8.8 A 4.5 4.5 0 0 0 8.8 15.2" />
+        <path d="M 15.2 8.8 A 4.5 4.5 0 0 1 15.2 15.2" />
+      </g>
+
+      {/* Outer wave arcs - safe margin inside 24x24 viewBox, never clips */}
+      <g className="receiver-wave-outer" strokeWidth="1.5">
+        <path d="M 6.0 6.0 A 8.5 8.5 0 0 0 6.0 18.0" />
+        <path d="M 18.0 6.0 A 8.5 8.5 0 0 1 18.0 18.0" />
+      </g>
+    </svg>
+  );
+}
+
+// Earth Globe Icon that rotates in 3D like a sphere on its polar axis
+function EarthGlobeIcon({ className = "w-[17px] h-[17px]" }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className={`shrink-0 overflow-visible ${className}`}
+      fill="none"
+      stroke="currentColor"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      {/* Outer constant spherical boundary (always maintains round planet silhouette) */}
+      <circle cx="12" cy="12" r="8.8" stroke="currentColor" strokeWidth="1.6" />
+
+      {/* Rotating 3D spherical inner meridians and parallels */}
+      <g className="earth-sphere-inner">
+        {/* Prime Meridian */}
+        <line x1="12" y1="3.2" x2="12" y2="20.8" stroke="currentColor" strokeWidth="1.2" />
+
+        {/* Curved longitude meridian ellipse */}
+        <ellipse cx="12" cy="12" rx="4.8" ry="8.8" stroke="currentColor" strokeWidth="1.2" />
+
+        {/* Equator */}
+        <line x1="3.2" y1="12" x2="20.8" y2="12" stroke="currentColor" strokeWidth="1.2" />
+
+        {/* Curved latitude parallels */}
+        <path d="M 5.8 7.5 Q 12 9.2 18.2 7.5" stroke="currentColor" strokeWidth="0.9" opacity="0.65" />
+        <path d="M 5.8 16.5 Q 12 14.8 18.2 16.5" stroke="currentColor" strokeWidth="0.9" opacity="0.65" />
+      </g>
+    </svg>
+  );
+}
+
 export default function Header({
   viewMode,
   setViewMode,
@@ -120,15 +182,17 @@ export default function Header({
         {loadedDataset && (
           <div className="relative inline-block" ref={dropdownRef}>
             <button
-              className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white border border-slate-200 shadow-xs text-primary font-label-md text-[12px] font-semibold hover:border-primary/50 transition-all cursor-pointer"
+              className="group flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white border border-slate-200 shadow-xs text-primary font-label-md text-[12px] font-semibold hover:border-primary/50 transition-all cursor-pointer"
               id="view-receiver-btn"
               type="button"
               onClick={() => setIsDropdownOpen((prev) => !prev)}
               aria-expanded={isDropdownOpen}
             >
-              <span className="material-symbols-outlined text-[17px] text-primary">
-                {viewMode === 'receiver' ? 'sensors' : 'public'}
-              </span>
+              {viewMode === 'receiver' ? (
+                <ReceiverWaveIcon className="w-[17px] h-[17px] text-primary" />
+              ) : (
+                <EarthGlobeIcon className="w-[17px] h-[17px] text-primary" />
+              )}
               <span>
                 {viewMode === 'receiver' ? 'Receiver View' : 'Environment View'}
               </span>
@@ -140,7 +204,7 @@ export default function Header({
             {isDropdownOpen && (
               <div className="absolute right-0 top-full mt-1.5 w-48 bg-white border border-slate-200 rounded-xl shadow-[0_4px_16px_rgba(0,0,0,0.06)] p-1 z-50 animate-in fade-in slide-in-from-top-1 duration-150">
                 <button
-                  className={`w-full flex items-center justify-between px-3 py-2 rounded-lg font-label-md text-[12px] font-semibold text-left transition-colors cursor-pointer ${
+                  className={`group w-full flex items-center justify-between px-3 py-2 rounded-lg font-label-md text-[12px] font-semibold text-left transition-colors cursor-pointer ${
                     viewMode === 'receiver'
                       ? 'bg-slate-50 text-primary'
                       : 'text-on-surface-variant hover:bg-slate-50 hover:text-on-surface'
@@ -152,7 +216,7 @@ export default function Header({
                   }}
                 >
                   <div className="flex items-center gap-2">
-                    <span className="material-symbols-outlined text-[17px]">sensors</span>
+                    <ReceiverWaveIcon className="w-[17px] h-[17px]" />
                     <span>Receiver View</span>
                   </div>
                   {viewMode === 'receiver' && (
@@ -160,10 +224,10 @@ export default function Header({
                   )}
                 </button>
                 <button
-                  className={`w-full flex items-center justify-between px-3 py-2 rounded-lg font-label-md text-[12px] text-left transition-colors ${
+                  className={`group w-full flex items-center justify-between px-3 py-2 rounded-lg font-label-md text-[12px] text-left transition-colors cursor-pointer ${
                     viewMode === 'environment'
-                      ? 'bg-slate-50 text-primary font-semibold cursor-pointer'
-                      : 'text-on-surface-variant hover:bg-slate-50 hover:text-on-surface cursor-pointer'
+                      ? 'bg-slate-50 text-primary font-semibold'
+                      : 'text-on-surface-variant hover:bg-slate-50 hover:text-on-surface'
                   }`}
                   type="button"
                   onClick={() => {
@@ -172,7 +236,7 @@ export default function Header({
                   }}
                 >
                   <div className="flex items-center gap-2">
-                    <span className="material-symbols-outlined text-[17px]">public</span>
+                    <EarthGlobeIcon className="w-[17px] h-[17px]" />
                     <span>Environment View</span>
                   </div>
                   {viewMode === 'environment' && (
