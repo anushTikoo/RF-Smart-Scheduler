@@ -11,8 +11,26 @@ The active LinUCB scheduler requires no emitter identity, emitter class, PRI, sc
 ## Setup
 
 ```powershell
-python -m venv .venv
-.venv\Scripts\python -m pip install -e ".[ml,dev]"
+py -m venv .venv
+& ".\.venv\Scripts\python.exe" -m pip install -e ".[dev]"
+```
+
+The repository intentionally does not contain the raw HDF5 dataset or generated NPZ caches. They are large, gated artifacts and are excluded by `.gitignore`.
+
+## Reproduce the training data on a new computer
+
+First accept the dataset conditions on Hugging Face and create a read token. Then run the secure setup helper from the repository root:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File ".\scripts\setup_training_data.ps1"
+```
+
+The helper hides the token while it is entered, exposes it only to the download process, and removes it afterward. It downloads exactly the 30 training and 10 validation files declared in `scaled_train_val.json`, audits them, and creates the processed episodes under `data/processed`.
+
+After data preparation, train and select the frozen LinUCB checkpoint:
+
+```powershell
+& ".\.venv\Scripts\python.exe" ".\scripts\linucb_train_validate.py"
 ```
 
 Do not place a Hugging Face token in source files or commit it. After accepting the gated dataset conditions, either configure it only in the current shell:
