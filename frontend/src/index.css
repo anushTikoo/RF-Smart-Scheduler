@@ -119,21 +119,27 @@
   scrollbar-width: none;
 }
 
-/* Flag Waving Animation & Cloth Rippling */
+/* Flag Waving Animation & Continuous Cloth Rippling */
 @keyframes flagClothWave {
-  0%, 100% {
-    transform: perspective(300px) rotateY(0deg) skewY(0deg);
+  0% {
+    transform: perspective(320px) rotateY(-3.5deg) rotateX(1.2deg) skewY(0.7deg);
   }
-  30% {
-    transform: perspective(300px) rotateY(-3.5deg) skewY(0.7deg);
+  25% {
+    transform: perspective(320px) rotateY(0.8deg) rotateX(-1.2deg) skewY(-0.5deg);
   }
-  70% {
-    transform: perspective(300px) rotateY(2.5deg) skewY(-0.5deg);
+  50% {
+    transform: perspective(320px) rotateY(3.2deg) rotateX(1deg) skewY(-0.8deg);
+  }
+  75% {
+    transform: perspective(320px) rotateY(-1.2deg) rotateX(-1deg) skewY(0.4deg);
+  }
+  100% {
+    transform: perspective(320px) rotateY(-3.5deg) rotateX(1.2deg) skewY(0.7deg);
   }
 }
 
 .flag-waving-anim {
-  animation: flagClothWave 4s ease-in-out infinite;
+  animation: flagClothWave 3.2s ease-in-out infinite;
   transform-origin: left center;
 }
 

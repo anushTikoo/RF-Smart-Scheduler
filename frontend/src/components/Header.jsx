@@ -1,11 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
 
-// High-fidelity waving Indian flag animated sources (WebP / GIF) with fallback chain
+// High-fidelity waving Indian flag animated sources (continuous loop GIFs) with fallback chain
 const WAVING_FLAG_SOURCES = [
-  "https://raw.githubusercontent.com/Malith-Rukshan/animated-country-flags/main/webp/IN.webp",
   "https://upload.wikimedia.org/wikipedia/commons/a/a4/India_flag-XL-anim.gif",
   "https://upload.wikimedia.org/wikipedia/commons/4/4b/Animated-Flag-India.gif",
-  "https://lh3.googleusercontent.com/aida/AEtjO1Ul4VVCweAGnjmVHZ6Cqwhho9t5b1n0FxJ4L5qTzGuHFLzlCH_5j7DqRpnj6xb5U6DV05vIN8MhKKGbP7Tw6FXY6TGR9L8g3My3WWJxl96c8aq3Po7N7MXBQPCiAc-_ko0GUPpFw1Q8lEbDBt85-ydJu6-rBX01Et3efgbrtN0fHrXQB4tYkTNa2vo01xI6cVaL2RuRqAGnLSI0bOXAkOj0yIqZqORWqEfYDM6gnpC9smapVhaSS5h5ig",
   "/india-flag.png"
 ];
 

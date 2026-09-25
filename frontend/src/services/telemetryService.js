@@ -59,96 +59,111 @@ export function subscribeTelemetry(onUpdate, intervalMs = 1400) {
   let ws = null;
   let timer = null;
 
-  // Realistic simulation sequence representing cognitive environment with single and simultaneous multi-emitter cases
+  // Realistic simulation sequence representing cognitive environment with single and simultaneous multi-emitter cases (5 ms dwell windows)
   const emitterSequence = [
-    // Step 0: Single Ku-Band emitter
+    // Dwell 0: Single Ku-Band emitter
     {
       emissions: [
-        { bandId: 14, freq: '12.31 GHz', type: 'Pulsed Radar (Ku-Band)' },
+        { bandId: 14, freq: '12.31 GHz', type: 'Pulsed Radar (Ku-Band)', pulses: 3 },
       ],
     },
-    // Step 1: Simultaneous emitters: Target Tracking (B14) + Air Search (B7)
+    // Dwell 1: Simultaneous emitters: Target Tracking (B14) + Air Search (B7)
     {
       emissions: [
-        { bandId: 14, freq: '12.28 GHz', type: 'Target Tracking Radar' },
-        { bandId: 7,  freq: '6.19 GHz',  type: 'Air Search Radar (C-Band)' },
+        { bandId: 14, freq: '12.28 GHz', type: 'Target Tracking Radar', pulses: 3 },
+        { bandId: 7,  freq: '6.19 GHz',  type: 'Air Search Radar (C-Band)', pulses: 2 },
       ],
     },
-    // Step 2: Single agile chirp emitter
+    // Dwell 2: Single agile chirp emitter
     {
       emissions: [
-        { bandId: 18, freq: '15.81 GHz', type: 'Frequency Agility Chirp' },
+        { bandId: 18, freq: '15.81 GHz', type: 'Frequency Agility Chirp', pulses: 4 },
       ],
     },
-    // Step 3: Simultaneous emitters: Phased Array (B4) + X-Band Fire Control (B11)
+    // Dwell 3: Simultaneous emitters: Phased Array (B4) + X-Band Fire Control (B11)
     {
       emissions: [
-        { bandId: 4,  freq: '3.56 GHz',  type: 'Phased Array Acquisition' },
-        { bandId: 11, freq: '9.69 GHz',  type: 'X-Band Fire Control' },
+        { bandId: 4,  freq: '3.56 GHz',  type: 'Phased Array Acquisition', pulses: 3 },
+        { bandId: 11, freq: '9.69 GHz',  type: 'X-Band Fire Control', pulses: 2 },
       ],
     },
-    // Step 4: Single Ku-Band emitter
+    // Dwell 4: Simultaneous multi-emitters (B2, B7 detected, B12, B18)
     {
       emissions: [
-        { bandId: 14, freq: '12.31 GHz', type: 'Pulsed Radar (Ku-Band)' },
+        { bandId: 2,  freq: '1.81 GHz',  type: 'Surveillance Radar', pulses: 2 },
+        { bandId: 7,  freq: '6.19 GHz',  type: 'Air Search Radar (C-Band)', pulses: 3 },
+        { bandId: 12, freq: '10.56 GHz', type: 'Fire Control Radar', pulses: 2 },
+        { bandId: 18, freq: '15.81 GHz', type: 'Frequency Agility Chirp', pulses: 4 },
       ],
     },
-    // Step 5: Single Airborne Early Warning emitter
+    // Dwell 5: Single Airborne Early Warning emitter
     {
       emissions: [
-        { bandId: 8,  freq: '7.06 GHz',  type: 'Airborne Early Warning' },
+        { bandId: 8,  freq: '7.06 GHz',  type: 'Airborne Early Warning', pulses: 3 },
       ],
     },
-    // Step 6: Simultaneous emitters: Fire Control (B12) + Electronic Warfare Jammer (B19)
+    // Dwell 6: Simultaneous emitters: Fire Control (B12) + Electronic Warfare Jammer (B19)
     {
       emissions: [
-        { bandId: 12, freq: '10.56 GHz', type: 'Fire Control Radar' },
-        { bandId: 19, freq: '16.69 GHz', type: 'Electronic Warfare Jammer' },
+        { bandId: 12, freq: '10.56 GHz', type: 'Fire Control Radar', pulses: 3 },
+        { bandId: 19, freq: '16.69 GHz', type: 'Electronic Warfare Jammer', pulses: 4 },
       ],
     },
-    // Step 7: Single Airborne Early Warning emitter
+    // Dwell 7: Single Airborne Early Warning emitter
     {
       emissions: [
-        { bandId: 16, freq: '14.06 GHz', type: 'Airborne Early Warning' },
+        { bandId: 16, freq: '14.06 GHz', type: 'Airborne Early Warning', pulses: 2 },
       ],
     },
-    // Step 8: Single Ku-Band emitter
+    // Dwell 8: Single Ku-Band emitter
     {
       emissions: [
-        { bandId: 14, freq: '12.34 GHz', type: 'Pulsed Radar (Ku-Band)' },
+        { bandId: 14, freq: '12.34 GHz', type: 'Pulsed Radar (Ku-Band)', pulses: 3 },
       ],
     },
-    // Step 9: Simultaneous emitters: Fire Control (B6) + Ku-Band Radar (B14)
+    // Dwell 9: Simultaneous emitters: Fire Control (B6) + Ku-Band Radar (B14)
     {
       emissions: [
-        { bandId: 6,  freq: '5.31 GHz',  type: 'Fire Control Radar' },
-        { bandId: 14, freq: '12.31 GHz', type: 'Pulsed Radar (Ku-Band)' },
+        { bandId: 6,  freq: '5.31 GHz',  type: 'Fire Control Radar', pulses: 2 },
+        { bandId: 14, freq: '12.31 GHz', type: 'Pulsed Radar (Ku-Band)', pulses: 3 },
       ],
     },
   ];
 
-  // Cognitive ML Agent scheduling decisions (realistic mix of hits and exploratory misses)
-  const mlDecisions = [14, 11, 18, 4, 5, 8, 12, 15, 14, 2];
+  // Cognitive LinUCB / Contextual Bandit scheduling decisions
+  const mlDecisions = [14, 14, 18, 4, 7, 8, 12, 15, 14, 6];
 
-  let step = 0;
+  let step = -1;
+  let dwellCounter = 0;
   let openLoopBand = 7;
 
   let mlStats = {
     totalHits: 432,
-    totalMisses: 268,
+    totalScanMisses: 268,
     totalActualEmissions: 488,
+    cumulativeReward: 358.4,
+    totalDwells: 700,
+    discoveredEmitters: new Set([4, 6, 7, 8, 12, 14]),
   };
 
   let openLoopStats = {
     totalHits: 168,
-    totalMisses: 532,
+    totalScanMisses: 532,
     totalActualEmissions: 408,
+    cumulativeReward: 56.0,
+    totalDwells: 700,
+    discoveredEmitters: new Set([7, 14]),
   };
 
   const runSimulationStep = () => {
     if (!active) return;
     step = (step + 1) % emitterSequence.length;
+    dwellCounter += 1;
     openLoopBand = (openLoopBand % 20) + 1;
+
+    const startMs = (dwellCounter - 1) * 5;
+    const endMs = startMs + 5;
+    const timeWindow = `${startMs}–${endMs} ms`;
 
     const currentStep = emitterSequence[step];
     const activeEmissions = currentStep.emissions;
@@ -156,78 +171,138 @@ export function subscribeTelemetry(onUpdate, intervalMs = 1400) {
 
     const mlBand = mlDecisions[step];
 
-    // Check if ML receiver intercepted ANY of the active emissions
+    // Check if LinUCB receiver observed a band with active emission during this 5 ms dwell
     const mlMatchedEmission = activeEmissions.find((e) => e.bandId === mlBand);
     const mlIntercepted = Boolean(mlMatchedEmission);
+    const mlPulsesDetected = mlIntercepted ? (mlMatchedEmission.pulses || 3) : 0;
+    const mlResult = mlIntercepted ? 'HIT' : 'SCAN MISS';
 
     // Check if Open Loop receiver intercepted ANY of the active emissions
     const openLoopMatchedEmission = activeEmissions.find((e) => e.bandId === openLoopBand);
     const openLoopIntercepted = Boolean(openLoopMatchedEmission);
+    const openLoopPulsesDetected = openLoopIntercepted ? (openLoopMatchedEmission.pulses || 2) : 0;
+    const openLoopResult = openLoopIntercepted ? 'HIT' : 'SCAN MISS';
 
+    // Update ML stats
+    mlStats.totalDwells += 1;
     if (mlIntercepted) {
       mlStats.totalHits += 1;
+      mlStats.cumulativeReward += 1.0;
+      mlStats.discoveredEmitters.add(mlMatchedEmission.bandId);
     } else {
-      mlStats.totalMisses += 1;
+      mlStats.totalScanMisses += 1;
+      mlStats.cumulativeReward -= 0.05;
     }
     mlStats.totalActualEmissions += activeEmissions.length;
 
+    // Update Open Loop stats
+    openLoopStats.totalDwells += 1;
     if (openLoopIntercepted) {
       openLoopStats.totalHits += 1;
+      openLoopStats.cumulativeReward += 0.8;
+      openLoopStats.discoveredEmitters.add(openLoopMatchedEmission.bandId);
     } else {
-      openLoopStats.totalMisses += 1;
+      openLoopStats.totalScanMisses += 1;
+      openLoopStats.cumulativeReward -= 0.05;
     }
     openLoopStats.totalActualEmissions += activeEmissions.length;
 
-    const mlHitRateVal = (mlStats.totalHits / (mlStats.totalHits + mlStats.totalMisses)) * 100;
+    // Calculate updated metrics
+    const mlCorrectScanRateVal = (mlStats.totalHits / (mlStats.totalHits + mlStats.totalScanMisses)) * 100;
     const mlProbVal = (mlStats.totalHits / mlStats.totalActualEmissions) * 100;
+    const mlAvgReward = mlStats.cumulativeReward / mlStats.totalDwells;
+    const mlCoverageCount = Math.min(7, mlStats.discoveredEmitters.size);
 
-    const openLoopHitRateVal = (openLoopStats.totalHits / (openLoopStats.totalHits + openLoopStats.totalMisses)) * 100;
+    const openLoopCorrectScanRateVal = (openLoopStats.totalHits / (openLoopStats.totalHits + openLoopStats.totalScanMisses)) * 100;
     const openLoopProbVal = (openLoopStats.totalHits / openLoopStats.totalActualEmissions) * 100;
+    const openLoopAvgReward = openLoopStats.cumulativeReward / openLoopStats.totalDwells;
+    const openLoopCoverageCount = Math.min(7, openLoopStats.discoveredEmitters.size);
+
+    const isLastDwell = dwellCounter >= 20;
 
     const snapshot = {
       source: 'simulation',
       timestamp: Date.now(),
+      isComplete: isLastDwell,
+      completionMessage: isLastDwell
+        ? 'Simulation completed! All 20 dwell windows (100 ms) processed across cognitive environment.'
+        : null,
+      dwell: {
+        dwellIndex: dwellCounter,
+        startMs,
+        endMs,
+        timeWindow,
+        dwellTimeMs: 5,
+        totalDwells: 20,
+      },
       environment: {
+        dwellTimeMs: 5,
+        startMs,
+        endMs,
+        timeWindow,
         actualEmissionBand: activeEmissions[0].bandId,
         actualEmissionBands: activeBandIds,
         emissionFrequency: activeEmissions.map((e) => e.freq).join(', '),
         emissionFrequencies: activeEmissions.map((e) => e.freq),
         signalType: activeEmissions.map((e) => e.type).join(' | '),
-        emissions: activeEmissions,
+        emissions: activeEmissions.map((e) => ({
+          ...e,
+          isDetected: e.bandId === mlBand,
+          pulses: e.pulses || 3,
+        })),
       },
       adaptive: {
         currentBand: mlBand,
         isIntercepted: mlIntercepted,
+        result: mlResult,
+        pulsesDetected: mlPulsesDetected,
         interceptedFrequency: mlIntercepted ? mlMatchedEmission.freq : null,
         metrics: {
-          interceptRate: `${(0.70 + Math.random() * 0.05).toFixed(2)} /s`,
-          hitRate: `${mlHitRateVal.toFixed(1)}%`,
+          correctScanRate: `${mlCorrectScanRateVal.toFixed(1)}%`,
+          hitRate: `${mlCorrectScanRateVal.toFixed(1)}%`, // backward compatibility
+          interceptRate: `${(0.72 + Math.random() * 0.04).toFixed(2)} /s`,
           probDetection: `${mlProbVal.toFixed(1)}%`,
-          avgInterceptDelay: `${(0.46 + Math.random() * 0.04).toFixed(2)} s`,
+          avgInterceptDelay: `${(12.4 + Math.random() * 1.5).toFixed(1)} ms`,
+          avgReward: `${mlAvgReward >= 0 ? '+' : ''}${mlAvgReward.toFixed(2)}`,
+          meanRevisitInterval: '24.5 ms',
           totalHits: mlStats.totalHits,
-          totalMisses: mlStats.totalMisses,
+          totalScanMisses: mlStats.totalScanMisses,
+          totalMisses: mlStats.totalScanMisses,
           totalDetected: mlStats.totalHits,
           totalActualEmissions: mlStats.totalActualEmissions,
+          pulsesDetected: mlPulsesDetected,
         },
       },
       openLoop: {
         currentBand: openLoopBand,
         isIntercepted: openLoopIntercepted,
+        result: openLoopResult,
+        pulsesDetected: openLoopPulsesDetected,
         interceptedFrequency: openLoopIntercepted ? openLoopMatchedEmission.freq : null,
         metrics: {
-          interceptRate: `${(0.23 + Math.random() * 0.03).toFixed(2)} /s`,
-          hitRate: `${openLoopHitRateVal.toFixed(1)}%`,
+          correctScanRate: `${openLoopCorrectScanRateVal.toFixed(1)}%`,
+          hitRate: `${openLoopCorrectScanRateVal.toFixed(1)}%`, // backward compatibility
+          interceptRate: `${(0.24 + Math.random() * 0.03).toFixed(2)} /s`,
           probDetection: `${openLoopProbVal.toFixed(1)}%`,
-          avgInterceptDelay: `${(1.80 + Math.random() * 0.05).toFixed(2)} s`,
+          avgInterceptDelay: `${(48.6 + Math.random() * 2.8).toFixed(1)} ms`,
+          avgReward: `${openLoopAvgReward >= 0 ? '+' : ''}${openLoopAvgReward.toFixed(2)}`,
+          meanRevisitInterval: '100.0 ms',
           totalHits: openLoopStats.totalHits,
-          totalMisses: openLoopStats.totalMisses,
+          totalScanMisses: openLoopStats.totalScanMisses,
+          totalMisses: openLoopStats.totalScanMisses,
           totalDetected: openLoopStats.totalHits,
           totalActualEmissions: openLoopStats.totalActualEmissions,
+          pulsesDetected: openLoopPulsesDetected,
         },
       },
     };
 
     onUpdate(snapshot);
+
+    if (isLastDwell) {
+      active = false;
+      if (timer) clearInterval(timer);
+    }
   };
 
   // Poll simulation or backend

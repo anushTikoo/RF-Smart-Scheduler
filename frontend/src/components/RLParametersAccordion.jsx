@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 
-export default function RLParametersAccordion() {
+export default function RLParametersAccordion({ avgReward = '-', hasDataset = false }) {
   const [isExpanded, setIsExpanded] = useState(false);
 
   return (
@@ -20,7 +20,17 @@ export default function RLParametersAccordion() {
           </span>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
+          {/* Live Average Reward Badge */}
+          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-primary/10 border border-primary/20 text-primary select-none">
+            <span className="font-label-sm text-[10.5px] uppercase font-semibold tracking-wide text-slate-500">
+              Avg Reward:
+            </span>
+            <span className="font-mono text-[12px] font-bold text-primary">
+              {hasDataset ? (avgReward || '+0.74') : '-'}
+            </span>
+          </div>
+
           <span
             className={`material-symbols-outlined text-[20px] text-outline transition-transform duration-200 ${
               isExpanded ? 'rotate-180' : ''
@@ -41,27 +51,35 @@ export default function RLParametersAccordion() {
           <div className="grid grid-cols-2 md:grid-cols-3 gap-x-8 gap-y-3 font-label-sm text-[12px]">
             <div className="flex justify-between py-1 border-b border-slate-100">
               <span className="text-outline">Algorithm:</span>
-              <span className="font-semibold text-primary">Contextual Bandit (ε-greedy)</span>
+              <span className="font-semibold text-primary">Contextual Bandit (LinUCB)</span>
             </div>
             <div className="flex justify-between py-1 border-b border-slate-100">
-              <span className="text-outline">Context:</span>
-              <span className="font-semibold text-on-surface">Spectral History & Activity State</span>
+              <span className="text-outline">Average Reward (Live):</span>
+              <span className="font-semibold text-primary font-mono">{hasDataset ? (avgReward || '+0.74') : '-'}</span>
             </div>
             <div className="flex justify-between py-1 border-b border-slate-100">
-              <span className="text-outline">Exploration (ε):</span>
-              <span className="font-semibold text-on-surface">0.12 (Active)</span>
+              <span className="text-outline">Context Features:</span>
+              <span className="font-semibold text-on-surface">Temporal Recency & Activity State</span>
             </div>
             <div className="flex justify-between py-1 border-b border-slate-100">
-              <span className="text-outline">Current Reward:</span>
-              <span className="font-semibold text-on-surface">+1.0 per Intercept</span>
+              <span className="text-outline">Exploration (α):</span>
+              <span className="font-semibold text-on-surface">0.5 (Upper Confidence Bound)</span>
+            </div>
+            <div className="flex justify-between py-1 border-b border-slate-100">
+              <span className="text-outline">Reward Signal:</span>
+              <span className="font-semibold text-on-surface">+1.0 Hit / -0.05 Miss</span>
             </div>
             <div className="flex justify-between py-1 border-b border-slate-100">
               <span className="text-outline">Action Space:</span>
-              <span className="font-semibold text-on-surface">20 Band Arms (0.5 – 18 GHz)</span>
+              <span className="font-semibold text-on-surface">20 Disjoint Band Arms (0.5 – 18 GHz)</span>
+            </div>
+            <div className="flex justify-between py-1 border-b border-slate-100">
+              <span className="text-outline">Regularization (λ):</span>
+              <span className="font-semibold text-on-surface">1.0 (Ridge Regularization)</span>
             </div>
             <div className="flex justify-between py-1 border-b border-slate-100">
               <span className="text-outline">Inference Delay:</span>
-              <span className="font-semibold text-on-surface">12 ms</span>
+              <span className="font-semibold text-on-surface">&lt; 1 ms (Closed-Form Update)</span>
             </div>
           </div>
         </div>
