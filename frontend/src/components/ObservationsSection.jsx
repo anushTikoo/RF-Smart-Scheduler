@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useLayoutEffect } from 'react';
 
 // Discrete Stepped Band vs. Time Graph Icon with orthogonal horizontal dwell lines & vertical transitions
 function BandStepGraphIcon({ className = "w-[20px] h-[20px] text-primary" }) {
@@ -42,17 +42,86 @@ export default function ObservationsSection({
   const [isViewDropdownOpen, setIsViewDropdownOpen] = useState(false);
   const [isFilterDropdownOpen, setIsFilterDropdownOpen] = useState(false);
 
+  const CHUNK_SIZE = 20;
+  const SLOT_WIDTH = 44;
+
+  // Graph state: graphRevealedCount starts at CHUNK_SIZE (shows latest 20 dwells).
+  // Scrolling/dragging backwards prepends earlier dwells by increasing graphRevealedCount in fixed CHUNK_SIZE increments.
+  const [graphRevealedCount, setGraphRevealedCount] = useState(CHUNK_SIZE);
+  const [isLoadingEarlierGraph, setIsLoadingEarlierGraph] = useState(false);
+
+  // Table state: tableVisibleCount starts at CHUNK_SIZE (20).
+  // Scrolling downwards to the bottom appends earlier decisions in fixed CHUNK_SIZE increments.
+  const [tableVisibleCount, setTableVisibleCount] = useState(CHUNK_SIZE);
+  const [isLoadingEarlierTable, setIsLoadingEarlierTable] = useState(false);
+
   const sliderRef = useRef(null);
   const isDownRef = useRef(false);
   const startXRef = useRef(0);
   const scrollLeftRef = useRef(0);
+  const userScrolledBackRef = useRef(false);
+  const prevObsLengthRef = useRef(0);
+
+  // Robust loading lock & re-arm flags to guarantee fixed-chunk increments
+  const isLoadingGraphRef = useRef(false);
+  const canLoadEarlierGraphRef = useRef(true);
+  const isPrependingGraphRef = useRef(false);
+  const prevGraphDwellsLenRef = useRef(0);
+
+  const isLoadingTableRef = useRef(false);
+  const canLoadTableRef = useRef(true);
 
   const [hoverInfo, setHoverInfo] = useState(null);
+
+  // Graph dwells: latest graphRevealedCount dwells
+  const graphDwells = observations.slice(-Math.max(CHUNK_SIZE, graphRevealedCount));
+
+  // Auto-scroll graph to leading edge ONLY if user has NOT scrolled back
+  useEffect(() => {
+    if (!sliderRef.current) return;
+    const len = observations.length;
+    if (len > prevObsLengthRef.current) {
+      if (!userScrolledBackRef.current && isScanning) {
+        sliderRef.current.scrollLeft = sliderRef.current.scrollWidth;
+      }
+    }
+    prevObsLengthRef.current = len;
+  }, [observations.length, isScanning]);
+
+  // Seamless scrollLeft offset compensation when earlier dwells are prepended to the graph
+  useLayoutEffect(() => {
+    if (!sliderRef.current) return;
+    const currentLen = graphDwells.length;
+    const added = currentLen - prevGraphDwellsLenRef.current;
+
+    if (added > 0 && isPrependingGraphRef.current) {
+      const addedPx = added * SLOT_WIDTH;
+      sliderRef.current.scrollLeft += addedPx;
+      scrollLeftRef.current += addedPx;
+      isPrependingGraphRef.current = false;
+    }
+
+    prevGraphDwellsLenRef.current = currentLen;
+  }, [graphDwells.length]);
+
+  // When a new dataset or replay is loaded, reset revealed counts
+  useEffect(() => {
+    if (observations.length === 0) {
+      setGraphRevealedCount(CHUNK_SIZE);
+      setTableVisibleCount(CHUNK_SIZE);
+      userScrolledBackRef.current = false;
+      canLoadEarlierGraphRef.current = true;
+      canLoadTableRef.current = true;
+      isLoadingGraphRef.current = false;
+      isLoadingTableRef.current = false;
+      prevGraphDwellsLenRef.current = 0;
+    }
+  }, [observations.length]);
 
   // Fallback to 'all' if user switched to receiver view while 'emissions' was selected
   const effectiveFilter = (viewMode === 'receiver' && filter === 'emissions') ? 'all' : filter;
 
-  // Filter options based on whether we are in Receiver View or Environmental View
+  // Filter options based on viewMode
   const filterOptions = viewMode === 'environment'
     ? [
         { id: 'all', label: 'All Dwells', desc: 'Hits, Scan Misses & Emissions' },
@@ -68,19 +137,49 @@ export default function ObservationsSection({
 
   const currentFilterMeta = filterOptions.find((f) => f.id === effectiveFilter) || filterOptions[0];
 
-  // Auto-scroll graph to newest observation smoothly without CSS transition jitter
-  useEffect(() => {
-    if (sliderRef.current && isScanning && !isDownRef.current) {
-      sliderRef.current.scrollLeft = sliderRef.current.scrollWidth;
-    }
-  }, [observations.length, isScanning]);
+  // Trigger loading earlier dwells into the graph (prepending fixed chunk of 20 dwells)
+  const triggerLoadEarlierGraph = useCallback(() => {
+    if (isLoadingGraphRef.current || !canLoadEarlierGraphRef.current) return;
+    if (graphRevealedCount >= observations.length) return;
 
-  // Mouse pan handlers for the graph
+    isLoadingGraphRef.current = true;
+    canLoadEarlierGraphRef.current = false;
+    setIsLoadingEarlierGraph(true);
+
+    setTimeout(() => {
+      isPrependingGraphRef.current = true;
+      setGraphRevealedCount((prev) => Math.min(observations.length, prev + CHUNK_SIZE));
+      setIsLoadingEarlierGraph(false);
+      isLoadingGraphRef.current = false;
+    }, 280);
+  }, [graphRevealedCount, observations.length]);
+
+  // Graph wheel handler (supports natural wheel panning & backward fetch)
+  const handleGraphWheel = (e) => {
+    if (!sliderRef.current) return;
+    const delta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+    sliderRef.current.scrollLeft += delta;
+
+    if (sliderRef.current.scrollLeft > 35) {
+      canLoadEarlierGraphRef.current = true;
+    }
+
+    // If scrolled back to the left edge with delta < 0 (attempting to scroll further back)
+    if (sliderRef.current.scrollLeft <= 10 && delta < 0) {
+      triggerLoadEarlierGraph();
+    }
+
+    // Check if user has scrolled away from the right edge
+    const isAtRightEdge = sliderRef.current.scrollLeft >= sliderRef.current.scrollWidth - sliderRef.current.clientWidth - 20;
+    userScrolledBackRef.current = !isAtRightEdge;
+  };
+
+  // Mouse pan handlers for the graph (works smoothly during slow replay, fast scan, or completed)
   const handleMouseDown = (e) => {
     if (!sliderRef.current) return;
     isDownRef.current = true;
     setHoverInfo(null);
-    startXRef.current = e.pageX - sliderRef.current.offsetLeft;
+    startXRef.current = e.pageX;
     scrollLeftRef.current = sliderRef.current.scrollLeft;
   };
 
@@ -91,22 +190,64 @@ export default function ObservationsSection({
   const handleMouseMove = (e) => {
     if (isDownRef.current && sliderRef.current) {
       e.preventDefault();
-      const x = e.pageX - sliderRef.current.offsetLeft;
-      const walk = (x - startXRef.current) * 1.5;
-      sliderRef.current.scrollLeft = scrollLeftRef.current - walk;
+      const dx = e.pageX - startXRef.current;
+      sliderRef.current.scrollLeft = scrollLeftRef.current - dx;
+
+      if (sliderRef.current.scrollLeft > 35) {
+        canLoadEarlierGraphRef.current = true;
+      }
+
+      // If user drags towards right (dx > 30, meaning pulling earlier history) while at or near the left edge
+      if (sliderRef.current.scrollLeft <= 5 && dx > 30) {
+        triggerLoadEarlierGraph();
+      }
+
+      const isAtRightEdge = sliderRef.current.scrollLeft >= sliderRef.current.scrollWidth - sliderRef.current.clientWidth - 20;
+      userScrolledBackRef.current = !isAtRightEdge;
     }
   };
 
-  // Filter rows for the tabular view and CSV export
-  const filteredObservations = observations.filter((obs) => {
+  // Table scroll handler: infinite scroll downwards to load older decisions in fixed CHUNK_SIZE (20) increments
+  const handleTableScroll = (e) => {
+    const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
+    const distanceFromBottom = scrollHeight - (scrollTop + clientHeight);
+
+    if (distanceFromBottom > 50) {
+      canLoadTableRef.current = true;
+    }
+
+    if (distanceFromBottom <= 15 && canLoadTableRef.current && !isLoadingTableRef.current) {
+      if (tableVisibleCount < observations.length) {
+        isLoadingTableRef.current = true;
+        canLoadTableRef.current = false;
+        setIsLoadingEarlierTable(true);
+
+        setTimeout(() => {
+          setTableVisibleCount((prev) => Math.min(observations.length, prev + CHUNK_SIZE));
+          setIsLoadingEarlierTable(false);
+          isLoadingTableRef.current = false;
+        }, 280);
+      }
+    }
+  };
+
+  // Table rows: newest at top, older entries down below
+  const displayedTableDwells = observations.slice(-tableVisibleCount);
+  const filteredTableRows = [...displayedTableDwells].reverse().filter((obs) => {
     if (effectiveFilter === 'interceptions') return obs.isIntercepted;
     if (effectiveFilter === 'misses') return !obs.isIntercepted;
-    return true; // 'all' and 'emissions'
+    return true;
   });
 
   // CSV download function
   const handleExportCSV = () => {
-    if (!filteredObservations || filteredObservations.length === 0) {
+    const allFiltered = observations.filter((obs) => {
+      if (effectiveFilter === 'interceptions') return obs.isIntercepted;
+      if (effectiveFilter === 'misses') return !obs.isIntercepted;
+      return true;
+    });
+
+    if (!allFiltered || allFiltered.length === 0) {
       if (onExportNotify) {
         onExportNotify("No observations matching filter to export.");
       }
@@ -118,7 +259,7 @@ export default function ObservationsSection({
       ? ["Time Window", "Selected Band", "Intercepted Frequency", "Result", "Pulses Detected", "Active Emissions in Window", "Frequency Range"]
       : ["Time Window", "Selected Band", "Intercepted Frequency", "Result", "Pulses Detected", "Frequency Range"];
 
-    const rows = filteredObservations.map((obs) => {
+    const rows = allFiltered.map((obs) => {
       const resultText = obs.result || (obs.isIntercepted ? 'HIT' : 'SCAN MISS');
       const pulses = obs.pulsesDetected !== undefined ? obs.pulsesDetected : (obs.isIntercepted ? 3 : 0);
       const exactIntercepted = obs.isIntercepted ? (obs.interceptedFreq && obs.interceptedFreq !== '-' ? obs.interceptedFreq : obs.centerFreq) : '-';
@@ -160,41 +301,46 @@ export default function ObservationsSection({
     document.body.removeChild(link);
 
     if (onExportNotify) {
-      onExportNotify(`Exported ${filteredObservations.length} ${viewMode} observations as CSV`);
+      onExportNotify(`Exported ${allFiltered.length} ${viewMode} observations as CSV`);
     }
   };
 
   // Coordinate mapping for SVG Graph:
   // Band 1 (bottom) maps to Y=205, Band 20 (top) maps to Y=25. Usable height = 180px.
-  const slotWidth = 56;
-  const paddingLeft = 24;
-  const paddingRight = 50;
-  const plotWidth = Math.max(680, paddingLeft + observations.length * slotWidth + paddingRight);
+  const slotWidth = SLOT_WIDTH;
+  const paddingLeft = 20;
+  const paddingRight = 40;
+  const plotWidth = Math.max(680, paddingLeft + graphDwells.length * slotWidth + paddingRight);
   const plotHeight = 230;
 
-  // Exact mathematical mapping: Band 1 to Band 20
   const getY = (band) => {
     const b = Math.min(20, Math.max(1, Number(band) || 1));
     return 205 - ((b - 1) / 19) * 180;
   };
 
-  // Prepare geometry for each observation step
-  // Dwell segment covers the entire slot width so green (hit) and yellow (miss) lines are continuous
-  const pts = observations.map((obs, i) => {
+  // Prepare geometry for each dwell in graphDwells
+  const pts = graphDwells.map((obs, i) => {
     const startX = paddingLeft + i * slotWidth;
     const endX = startX + slotWidth;
     const midX = (startX + endX) / 2;
     const bandNum = obs.bandId || (obs.band ? parseInt(obs.band.replace(/\D/g, ''), 10) : 1);
     const y = getY(bandNum);
 
-    // Calculate Y for all actual emissions (single or simultaneous multi-emitter)
+    const dwellIdx = obs.dwellIndex || obs.id || (i + 1);
+    const startMs = obs.startMs !== undefined ? obs.startMs : Number(((dwellIdx - 1) * 0.5).toFixed(1));
+    const endMs = obs.endMs !== undefined ? obs.endMs : Number((dwellIdx * 0.5).toFixed(1));
+
     const emissions = (obs.actualEmissions || []).map((em) => ({
       ...em,
       y: getY(em.bandId || (em.band ? parseInt(em.band.replace(/\D/g, ''), 10) : 1)),
     }));
 
     return {
-      obs,
+      obs: {
+        ...obs,
+        startMs,
+        endMs,
+      },
       startX,
       endX,
       midX,
@@ -204,7 +350,6 @@ export default function ObservationsSection({
   });
 
   // Direct vertical lines connecting receiver band decisions between consecutive steps
-  // Only rendered when 'all' filter is active (i.e. both hits and misses toggled)
   const verticalLines = [];
   if (effectiveFilter === 'all' && pts.length > 1) {
     for (let i = 1; i < pts.length; i++) {
@@ -212,7 +357,7 @@ export default function ObservationsSection({
       const curr = pts[i];
       if (prev.y !== curr.y) {
         verticalLines.push({
-          id: `vl-${curr.obs.id}`,
+          id: `vl-${curr.obs.id || i}`,
           x: curr.startX,
           y1: prev.y,
           y2: curr.y,
@@ -224,7 +369,7 @@ export default function ObservationsSection({
   const latestPt = pts.length > 0 ? pts[pts.length - 1] : null;
   const cursorX = latestPt ? latestPt.endX : 0;
 
-  // Control visibility of graph layers based on viewMode and active filter
+  // Visibility of graph layers
   const showInterceptions = effectiveFilter === 'all' || effectiveFilter === 'interceptions';
   const showMisses = effectiveFilter === 'all' || effectiveFilter === 'misses';
   const showActualEmissions = viewMode === 'environment' && (effectiveFilter === 'all' || effectiveFilter === 'emissions');
@@ -372,7 +517,16 @@ export default function ObservationsSection({
 
       {/* Graph Container Display */}
       {displayMode === 'graph' && (
-        <div className="mt-4 flex flex-col w-full overflow-hidden" id="observation-graph-display">
+        <div className="mt-4 flex flex-col w-full overflow-hidden relative" id="observation-graph-display">
+          {/* Loading indicator at the start of the graph when scrolling backwards: ONLY icon, no text */}
+          {isLoadingEarlierGraph && (
+            <div className="absolute left-[74px] top-1/2 -translate-y-1/2 z-30 flex items-center justify-center w-8 h-8 rounded-full bg-slate-900/90 text-primary shadow-lg border border-slate-700/60 pointer-events-none select-none backdrop-blur-xs">
+              <span className="material-symbols-outlined text-[17px] text-primary animate-spin">
+                progress_activity
+              </span>
+            </div>
+          )}
+
           <div className="flex items-start w-full border border-slate-200 rounded-xl bg-white overflow-hidden shadow-2xs">
             {/* Synchronized Fixed Y-Axis SVG Ruler */}
             <div className="shrink-0 select-none bg-slate-50 border-r border-slate-200">
@@ -403,7 +557,7 @@ export default function ObservationsSection({
               </svg>
             </div>
 
-            {/* Pannable & Scrollable Graph Viewport */}
+            {/* Pannable & Scrollable Graph Viewport (Free drag & scroll during and after scan) */}
             <div
               className="relative flex-1 h-[230px] bg-white overflow-x-auto cursor-grab active:cursor-grabbing select-none"
               id="graph-pan-container"
@@ -412,6 +566,7 @@ export default function ObservationsSection({
               onMouseLeave={handleMouseLeaveOrUp}
               onMouseUp={handleMouseLeaveOrUp}
               onMouseMove={handleMouseMove}
+              onWheel={handleGraphWheel}
             >
               <svg
                 style={{ width: `${plotWidth}px`, height: `${plotHeight}px` }}
@@ -443,9 +598,9 @@ export default function ObservationsSection({
                     strokeWidth="1"
                   />
                 )}
-                {pts.map((pt) => (
+                {pts.map((pt, idx) => (
                   <line
-                    key={`v-grid-${pt.obs.id}`}
+                    key={`v-grid-${pt.obs.id || idx}`}
                     x1={pt.endX}
                     y1="20"
                     x2={pt.endX}
@@ -456,7 +611,7 @@ export default function ObservationsSection({
                   />
                 ))}
 
-                {/* Direct vertical lines connecting receiver band decisions (only when All or Both is active) */}
+                {/* Direct vertical lines connecting receiver band decisions */}
                 {verticalLines.map((vl) => (
                   <line
                     key={vl.id}
@@ -471,10 +626,9 @@ export default function ObservationsSection({
                 ))}
 
                 {/* Receiver Dwell Segments: Green (#10B981) for Interceptions, Yellow (#F59E0B) for Misses */}
-                {pts.map((pt) => {
+                {pts.map((pt, idx) => {
                   const isHit = pt.obs.isIntercepted;
 
-                  // Filter check: hide if filter excludes this observation type
                   if (isHit && !showInterceptions) return null;
                   if (!isHit && !showMisses) return null;
 
@@ -482,7 +636,7 @@ export default function ObservationsSection({
                   const freqText = pt.obs.interceptedFreq && pt.obs.interceptedFreq !== '-' ? pt.obs.interceptedFreq : pt.obs.centerFreq;
 
                   return (
-                    <g key={`dwell-group-${pt.obs.id}`}>
+                    <g key={`dwell-group-${pt.obs.id || idx}`}>
                       {isHit ? (
                         <g
                           style={{ cursor: 'pointer' }}
@@ -507,7 +661,6 @@ export default function ObservationsSection({
                           }}
                           onMouseLeave={() => setHoverInfo(null)}
                         >
-                          {/* Invisible wider hit area for easy hover targeting on horizontal line */}
                           <line
                             x1={pt.startX}
                             y1={pt.y}
@@ -542,17 +695,17 @@ export default function ObservationsSection({
                   );
                 })}
 
-                {/* Actual Emission Markers (Environmental View: Distinct Highlight for Detected vs Missed/Unmonitored Emissions) */}
+                {/* Actual Emission Markers (Environmental View) */}
                 {showActualEmissions &&
-                  pts.map((pt) => (
-                    <g key={`actual-emissions-group-${pt.obs.id}`}>
+                  pts.map((pt, pIdx) => (
+                    <g key={`actual-emissions-group-${pt.obs.id || pIdx}`}>
                       {pt.emissions.map((em, idx) => {
                         const isCaughtHere = (pt.obs.isIntercepted && pt.obs.bandId === em.bandId) || em.isDetected;
                         const emissionFreq = em.freqStr || (em.freqGhz ? `${Number(em.freqGhz).toFixed(2)} GHz` : `Band ${em.bandId}`);
 
                         return (
                           <g
-                            key={`em-marker-${pt.obs.id}-${em.bandId}-${idx}`}
+                            key={`em-marker-${pt.obs.id || pIdx}-${em.bandId}-${idx}`}
                             style={{ cursor: 'pointer' }}
                             className="cursor-pointer"
                             onMouseEnter={(e) => {
@@ -575,10 +728,8 @@ export default function ObservationsSection({
                             }}
                             onMouseLeave={() => setHoverInfo(null)}
                           >
-                            {/* Invisible wider hit area for easy hover targeting on diamond */}
                             <circle cx={pt.midX} cy={em.y} r="10" fill="transparent" />
                             {isCaughtHere ? (
-                              /* Detected Emission: Solid Emerald Diamond with Glow */
                               <polygon
                                 points={`${pt.midX},${em.y - 5.5} ${pt.midX + 5.5},${em.y} ${pt.midX},${em.y + 5.5} ${pt.midX - 5.5},${em.y}`}
                                 fill="#10B981"
@@ -587,7 +738,6 @@ export default function ObservationsSection({
                                 className="drop-shadow-[0_0_6px_rgba(16,185,129,0.9)] pointer-events-none"
                               />
                             ) : (
-                              /* Missed / Unmonitored Emission: Muted Slate Diamond */
                               <polygon
                                 points={`${pt.midX},${em.y - 4.5} ${pt.midX + 4.5},${em.y} ${pt.midX},${em.y + 4.5} ${pt.midX - 4.5},${em.y}`}
                                 fill="#94A3B8"
@@ -619,9 +769,9 @@ export default function ObservationsSection({
                   </g>
                 )}
 
-                {/* Standard Cartesian X-Axis Time Ticks: 0 ms, 5 ms, 10 ms, 15 ms, ... */}
+                {/* Standard Cartesian X-Axis Time Ticks */}
                 {pts.length > 0 && (
-                  <g key="x-tick-0">
+                  <g key="x-tick-start">
                     <line x1={pts[0].startX} y1="205" x2={pts[0].startX} y2="210" stroke="#94A3B8" strokeWidth="1.2" />
                     <text
                       x={pts[0].startX}
@@ -629,23 +779,40 @@ export default function ObservationsSection({
                       textAnchor="middle"
                       className="text-[10px] font-mono fill-slate-500 font-semibold select-none"
                     >
-                      0 ms
+                      {`${pts[0].obs.startMs.toFixed(1)} ms`}
                     </text>
                   </g>
                 )}
                 {pts.map((pt, idx) => {
-                  const timeMs = pt.obs.endMs !== undefined ? pt.obs.endMs : (idx + 1) * 5;
+                  const timeMs = pt.obs.endMs;
+                  const isLast = idx === pts.length - 1;
+                  const totalDwells = pts.length;
+
+                  // Dynamic Tick Labeling:
+                  // For normal window (<= 25 dwells, 0.5 ms dwell steps): labels every 1.0 ms or on last dwell.
+                  // When dragged backwards (> 25 dwells): labels at 5.0 ms intervals (e.g. 5, 10, 15, 20 ms).
+                  let showLabel = false;
+                  if (totalDwells <= 25) {
+                    showLabel = Math.round(timeMs * 10) % 10 === 0 || isLast;
+                  } else {
+                    showLabel = Math.round(timeMs * 10) % 50 === 0 || isLast;
+                  }
+
+                  const labelStr = `${timeMs.toFixed(1)} ms`;
+
                   return (
-                    <g key={`x-tick-${pt.obs.id}`}>
+                    <g key={`x-tick-${pt.obs.id || idx}`}>
                       <line x1={pt.endX} y1="205" x2={pt.endX} y2="210" stroke="#94A3B8" strokeWidth="1.2" />
-                      <text
-                        x={pt.endX}
-                        y="222"
-                        textAnchor="middle"
-                        className="text-[10px] font-mono fill-slate-500 font-semibold select-none"
-                      >
-                        {timeMs} ms
-                      </text>
+                      {showLabel && (
+                        <text
+                          x={pt.endX}
+                          y="222"
+                          textAnchor="middle"
+                          className="text-[10px] font-mono fill-slate-500 font-semibold select-none"
+                        >
+                          {labelStr}
+                        </text>
+                      )}
                     </g>
                   );
                 })}
@@ -666,7 +833,7 @@ export default function ObservationsSection({
               )}
 
               {/* Standby Message if no observations accumulated yet */}
-              {observations.length === 0 && (
+              {graphDwells.length === 0 && (
                 <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-400 gap-1.5 select-none pointer-events-none">
                   <BandStepGraphIcon className="w-6 h-6 text-slate-300" />
                   <span className="text-[12px] font-medium">Awaiting scan steps to plot timeline...</span>
@@ -675,12 +842,12 @@ export default function ObservationsSection({
             </div>
           </div>
 
-          {/* Graph Footer Bar: Interaction tip with subtle reduced-size icon and clear visual legend */}
+          {/* Graph Footer Bar */}
           <div className="flex flex-wrap items-center justify-between gap-2.5 pt-3 border-t border-slate-100 mt-2 text-[11px] text-slate-500 select-none">
             <div className="flex items-center gap-1.5">
               <span className="material-symbols-outlined text-[13px] text-primary">touch_app</span>
               <span>
-                Hover over intercepted dwells or emissions to inspect exact frequency. Drag to pan timeline.
+                Hover over intercepted dwells or emissions to inspect exact frequency. Drag or scroll backwards to view earlier history.
               </span>
             </div>
 
@@ -721,13 +888,17 @@ export default function ObservationsSection({
           {/* Subtitle note on table */}
           <div className="pb-2 text-[11px] text-slate-500 flex items-center justify-between">
             <span>
-              Recorded dwell observations stream ({filteredObservations.length} of {observations.length} total dwells)
+              Recorded dwell observations stream ({filteredTableRows.length} shown • {observations.length} total dwells)
             </span>
-            <span className="font-mono text-[10px] text-slate-400">Newest events displayed first</span>
+            <span className="font-mono text-[10px] text-slate-400">Scroll downwards to load previous decisions</span>
           </div>
 
-          {/* Scrollable table container */}
-          <div className="max-h-[340px] overflow-y-auto overflow-x-auto rounded-xl border border-slate-200 shadow-2xs">
+          {/* Scrollable table container with infinite scroll downwards */}
+          <div
+            className="max-h-[340px] overflow-y-auto overflow-x-auto rounded-xl border border-slate-200 shadow-2xs"
+            id="observation-table-scroll-area"
+            onScroll={handleTableScroll}
+          >
             <table className="w-full text-left text-xs font-label-sm border-collapse min-w-[620px]">
               <thead className="bg-slate-50 border-b border-slate-200 sticky top-0 z-10 shadow-2xs">
                 <tr>
@@ -742,8 +913,8 @@ export default function ObservationsSection({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-on-surface font-mono text-[11px]">
-                {filteredObservations.length > 0 ? (
-                  [...filteredObservations].reverse().map((row) => (
+                {filteredTableRows.length > 0 ? (
+                  filteredTableRows.map((row) => (
                     <tr key={row.id} className="hover:bg-slate-50/80 transition-colors">
                       <td className="py-2.5 px-3.5 font-bold text-slate-900 whitespace-nowrap">{row.timeWindow || row.timestamp}</td>
                       <td className="py-2.5 px-3.5 whitespace-nowrap">
@@ -758,52 +929,45 @@ export default function ObservationsSection({
                             {row.interceptedFreq && row.interceptedFreq !== '-' ? row.interceptedFreq : row.centerFreq}
                           </span>
                         ) : (
-                          <span className="text-slate-300 font-mono text-[13px] px-2 select-none">-</span>
+                          <span className="text-slate-400 font-medium">-</span>
                         )}
                       </td>
                       <td className="py-2.5 px-3.5 whitespace-nowrap">
                         {row.isIntercepted ? (
-                          <span className="whitespace-nowrap inline-flex items-center justify-center px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 font-bold text-[10px] border border-emerald-200 tracking-wide uppercase shadow-2xs">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-800 border border-emerald-200 font-bold shadow-2xs">
                             HIT
                           </span>
                         ) : (
-                          <span className="whitespace-nowrap inline-flex items-center justify-center px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-700 font-semibold text-[10px] border border-amber-200 tracking-wide uppercase">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-amber-50 text-amber-700 border border-amber-200 font-medium shadow-2xs">
                             SCAN MISS
                           </span>
                         )}
                       </td>
-                      <td className="py-2.5 px-3.5 whitespace-nowrap">
-                        <span className={`font-mono text-[11.5px] font-bold ${row.isIntercepted ? 'text-emerald-700' : 'text-slate-400'}`}>
-                          {row.pulsesDetected !== undefined ? row.pulsesDetected : (row.isIntercepted ? 3 : 0)}
-                        </span>
+                      <td className="py-2.5 px-3.5 whitespace-nowrap font-mono">
+                        <span className="font-semibold text-slate-700">{row.pulsesDetected}</span>
                       </td>
                       {viewMode === 'environment' && (
-                        <td className="py-2.5 px-3.5 text-slate-700 font-semibold text-[10.5px]">
-                          <div className="flex flex-wrap gap-1.5 items-center">
+                        <td className="py-2.5 px-3.5">
+                          <div className="flex flex-wrap items-center gap-1">
                             {row.actualEmissions && row.actualEmissions.length > 0 ? (
-                              row.actualEmissions.map((em, idx) => {
-                                const isDet = (row.isIntercepted && em.bandId === row.bandId) || em.isDetected;
-                                return (
-                                  <span
-                                    key={`em-${row.id}-${em.bandId}-${idx}`}
-                                    className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] border font-mono whitespace-nowrap ${
-                                      isDet
-                                        ? 'bg-emerald-50 text-emerald-800 border-emerald-300 font-bold'
-                                        : 'bg-slate-100 text-slate-600 border-slate-200 font-normal'
-                                    }`}
-                                  >
-                                    <span>Band {em.bandId}</span>
-                                    <span className={isDet ? 'text-emerald-700 font-extrabold' : 'text-slate-600'}>
-                                      ({em.freqStr || (em.freqGhz ? `${em.freqGhz.toFixed(2)} GHz` : '')})
-                                    </span>
-                                    <span className={`text-[9px] uppercase font-bold ml-0.5 ${isDet ? 'text-emerald-900' : 'text-slate-500'}`}>
-                                      {isDet ? '• Detected' : '• Missed'}
-                                    </span>
+                              row.actualEmissions.map((em, idx) => (
+                                <span
+                                  key={`table-em-${row.id}-${em.bandId}-${idx}`}
+                                  className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono ${
+                                    em.isDetected
+                                      ? 'bg-emerald-50 text-emerald-800 border border-emerald-200 font-bold'
+                                      : 'bg-slate-50 text-slate-600 border border-slate-200 font-medium'
+                                  }`}
+                                >
+                                  <span>Band {em.bandId}</span>
+                                  <span>({em.freqStr})</span>
+                                  <span className={em.isDetected ? 'text-emerald-700 font-bold' : 'text-slate-400'}>
+                                    [{em.isDetected ? 'Caught' : 'Missed'}]
                                   </span>
-                                );
-                              })
+                                </span>
+                              ))
                             ) : (
-                              <span className="text-slate-400 font-mono">-</span>
+                              <span className="text-slate-400">-</span>
                             )}
                           </div>
                         </td>
@@ -812,8 +976,20 @@ export default function ObservationsSection({
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={viewMode === 'environment' ? 6 : 5} className="py-10 text-center text-slate-400 font-sans text-xs">
-                      No dwell observations matching the selected filter ({currentFilterMeta.label}).
+                    <td colSpan={viewMode === 'environment' ? 6 : 5} className="py-8 text-center text-slate-400 select-none">
+                      No dwell records in this window matching the selected filter.
+                    </td>
+                  </tr>
+                )}
+                {/* Inline loading indicator at the bottom of the table: ONLY spinning icon, no text */}
+                {isLoadingEarlierTable && (
+                  <tr>
+                    <td colSpan={viewMode === 'environment' ? 6 : 5} className="py-3 bg-slate-50/90 border-t border-slate-200 text-center">
+                      <div className="inline-flex items-center justify-center">
+                        <span className="material-symbols-outlined text-[18px] text-primary animate-spin">
+                          progress_activity
+                        </span>
+                      </div>
                     </td>
                   </tr>
                 )}
