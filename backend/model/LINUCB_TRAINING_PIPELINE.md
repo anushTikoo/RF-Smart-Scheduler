@@ -63,7 +63,7 @@ Because scenarios contain different emitters and activity densities, raw per-sce
 
 ## Inference band trace
 
-Frozen validation and test runs write one CSV row for every receiver decision under their `traces` directories. Rows include step/time, band index, lower and upper frequency, pulse interceptions, miss and false-alarm flags, total reward and each reward component, and switching distance.
+Candidate-screening validation skips action traces and evaluates only LinUCB. Once the best candidate is selected, a single full validation comparison writes one CSV row for every LinUCB and round-robin decision under `outputs/linucb_pipeline/selected_validation/traces`. Final test runs write the same traces under their own `traces` directory. Rows include step/time, band index, lower and upper frequency, pulse interceptions, miss and false-alarm flags, total reward and each reward component, and switching distance.
 
 The final-test script prints the active LinUCB band every 100 decisions by default:
 
@@ -75,19 +75,23 @@ Use `--band-log-interval 1` for every decision or `0` to disable console band lo
 
 ## Hyperparameter selection
 
-`configs/linucb_search.yaml` declares an explicit compact search over:
+`configs/linucb_search.yaml` declares three exploration candidates:
 
 - exploration strength (`alpha`);
-- regularization;
-- coverage bonus;
-- revisit and uncertainty settings.
+- balanced exploration (`alpha=1.0`);
+- lower exploration (`alpha=0.5`);
+- higher exploration (`alpha=1.5`).
 
-Each candidate is independently trained on all 30 training scenarios. Validation selection uses highest mean reward, then pulse interception and lower first-intercept delay only as deterministic tie-breakers. Test data is not used for candidate selection.
+Regularization, coverage, revisit and uncertainty settings are held fixed so the three-candidate comparison remains interpretable. Each candidate is independently trained on all 30 training scenarios. Validation selection uses highest mean reward, then pulse interception and lower first-intercept delay only as deterministic tie-breakers. Test data is not used for candidate selection.
+
+The three candidates run in separate worker processes by default, but training order remains sequential within each candidate. LinUCB feature calculations are cached for the current dwell and vectorized across all bands. State vectors used only by DQN are not built on the LinUCB path.
+
+A compatible checkpoint, JSON history and CSV history are saved after every scenario. If a run is interrupted, rerunning the same command resumes from the last completed scenario. Resume is rejected if the paths, seed, receiver, reward or LinUCB options changed.
 
 ## Commands
 
 ```powershell
-.venv\Scripts\python scripts/linucb_train_validate.py
+& ".\.venv\Scripts\python.exe" ".\scripts\linucb_train_validate.py" --jobs 3
 ```
 
 After selection is complete and frozen, download/preprocess the sealed scenarios and run:

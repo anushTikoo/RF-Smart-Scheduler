@@ -1,0 +1,16 @@
+{
+  "dataset_id": "alan-turing-institute/turing-synthetic-radar-dataset",
+  "description": "Sealed V2 holdout. Do not download or inspect until V2 is frozen on train/validation.",
+  "files": [
+    {"split": "test", "mode": "stare", "config_id": 27},
+    {"split": "test", "mode": "stare", "config_id": 28},
+    {"split": "test", "mode": "stare", "config_id": 29},
+    {"split": "test", "mode": "stare", "config_id": 30},
+    {"split": "test", "mode": "stare", "config_id": 31},
+    {"split": "test", "mode": "stare", "config_id": 32},
+    {"split": "test", "mode": "stare", "config_id": 33},
+    {"split": "test", "mode": "stare", "config_id": 34},
+    {"split": "test", "mode": "stare", "config_id": 35},
+    {"split": "test", "mode": "stare", "config_id": 36}
+  ]
+}

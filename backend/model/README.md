@@ -2,11 +2,22 @@
 
 Model-only research prototype for learning a narrowband receiver scan policy from radar Pulse Descriptor Words (PDWs).
 
-The system treats stare-mode recordings from the Turing Synthetic Radar Dataset as oracle environmental truth. A simulated receiver observes only one 500 MHz band per dwell. Round-robin, random, greedy, periodicity-aware, LinUCB, and DQN schedulers are evaluated through identical episodes.
+## V2 (active model)
 
-The cache keeps both time-band aggregates and exact pulse times. Exact events are used for amplitude thresholding, configurable decision/retune/settling latency, and online next-pulse prediction. The 5 ms dwell is a scheduling time step, not a claim that the Python prototype makes a hardware decision between two pulses a few microseconds apart. Real-time feasibility must later be measured on the target receiver/FPGA/processor with non-zero latency configured in `configs/micro.yaml`.
+The active V2 experiment uses 20 bands over 500–18,000 MHz, a 500 us dwell,
+and a 10 ms round-robin sweep. It compares only round-robin and a persistent
+shared LinUCB contextual bandit. DQN and the other heuristic schedulers are
+legacy research code and are not part of V2 training, selection, or reporting.
 
-The active LinUCB scheduler requires no emitter identity, emitter class, PRI, scan pattern, or pre-mission frequency plan. Its context is built only from receiver-observable per-band history: visit recency, hit EWMA, pulse count, amplitude, consecutive no-hit observations, anonymously inferred band periodicity, anonymous band-activity prediction, switching distance, uncertainty, coverage urgency, and time. Dataset emitter labels remain simulator truth for offline reward and evaluation only. Frozen validation/test inference does not update from oracle rewards.
+V2 removes absolute band position, mission phase, amplitude, switching distance,
+and emitter identity from the model context. See `V2_MODEL_PROTOCOL.md` for the
+frozen feature, reward, leakage, selection, metric, and execution specification.
+
+The system treats stare-mode recordings from the Turing Synthetic Radar Dataset as oracle environmental truth. The V2 simulated receiver observes one 875 MHz band per dwell. The active experiment compares a contextual-bandit LinUCB scheduler with round-robin. The earlier DQN implementation remains only as legacy research code; it is not imported, trained, or evaluated by the V2 pipeline.
+
+The cache keeps both time-band aggregates and exact pulse times. Exact events are used for amplitude thresholding and configurable decision/retune/settling latency. The 500 us dwell is a continuous listening interval and scheduling time step; it is not a claim that one receiver can retune between arbitrary pulses a few microseconds apart. V2 records scheduler p99 latency and deadline misses explicitly.
+
+The active LinUCB scheduler requires no emitter identity, emitter class, PRI, scan pattern, or pre-mission frequency plan. Its context is built only from receiver-observable per-band history: visit recency, hit EWMA, log pulse count, consecutive no-hit observations, learned periodicity, and optionally anonymous next-active-dwell urgency. Dataset emitter labels remain simulator truth for offline reward and evaluation only. Frozen validation/test inference does not update from oracle rewards.
 
 ## Setup
 
@@ -27,10 +38,11 @@ powershell -ExecutionPolicy Bypass -File ".\scripts\setup_training_data.ps1"
 
 The helper hides the token while it is entered, exposes it only to the download process, and removes it afterward. It downloads exactly the 30 training and 10 validation files declared in `scaled_train_val.json`, audits them, and creates the processed episodes under `data/processed`.
 
-After data preparation, train and select the frozen LinUCB checkpoint:
+After data preparation, preprocess and train V2:
 
 ```powershell
-& ".\.venv\Scripts\python.exe" ".\scripts\linucb_train_validate.py"
+& ".\.venv\Scripts\python.exe" ".\scripts\v2_preprocess.py"
+& ".\.venv\Scripts\python.exe" ".\scripts\v2_train_validate.py" --jobs 3
 ```
 
 Do not place a Hugging Face token in source files or commit it. After accepting the gated dataset conditions, either configure it only in the current shell:
@@ -45,7 +57,12 @@ or use the secure helper, which hides the input and removes the token from the p
 powershell -ExecutionPolicy Bypass -File scripts/download_micro_dataset.ps1
 ```
 
-## Verify without external data
+## Legacy V1/DQN research code
+
+The commands and files below are retained only to reproduce older experiments.
+They are not part of the V2 model decision.
+
+### Verify without external data
 
 ```powershell
 smart-scan synthetic --output data/processed/synthetic_episode.npz
@@ -113,13 +130,13 @@ Emitter labels are retained in processed episode caches because they are require
 
 ## Persistent LinUCB train/validation/test pipeline
 
-Train every candidate continuously across all 30 training scenarios, evaluate the resulting frozen checkpoints on the 10 validation scenarios, and freeze the best validation configuration:
+Train every candidate continuously across all 30 training scenarios, evaluate the resulting frozen checkpoints on the 10 validation scenarios, and freeze the best validation configuration. The three independent candidates run in parallel by default; scenario order inside each candidate remains sequential:
 
 ```powershell
-.venv\Scripts\python scripts/linucb_train_validate.py
+& ".\.venv\Scripts\python.exe" ".\scripts\linucb_train_validate.py" --jobs 3
 ```
 
-The compact candidate search is declared in `configs/linucb_search.yaml`. Selection maximizes validation reward, with pulse interception and lower first-intercept delay used only as tie-breakers. The command produces:
+The compact three-candidate search is declared in `configs/linucb_search.yaml`. Selection maximizes validation reward, with pulse interception and lower first-intercept delay used only as tie-breakers. A resumable checkpoint is written after every completed training scenario. Rerunning the same command resumes only if the scenario list, seed, receiver, reward and model settings match; use `--no-resume` or a new output directory to start over. The command produces:
 
 - `outputs/linucb_pipeline/frozen_linucb.npz`
 - `outputs/linucb_pipeline/frozen_config.yaml`
@@ -128,6 +145,8 @@ The compact candidate search is declared in `configs/linucb_search.yaml`. Select
 - `outputs/linucb_pipeline/frozen_training_history.json`
 
 During training, the terminal reports each scenario's average reward, contextual reward-prediction MSE, and five-scenario rolling values. LinUCB is a closed-form contextual bandit rather than a neural network, so reward-prediction MSE is the relevant loss-like diagnostic. Scenario rewards need not increase monotonically because each file contains a different RF environment; use the rolling series and validation results to judge learning.
+
+Candidate screening evaluates only frozen LinUCB and does not write large action traces. After selection, round-robin is evaluated once and detailed traces for both schedulers are written under `outputs/linucb_pipeline/selected_validation/traces`. This avoids repeating the identical round-robin baseline for every candidate.
 
 Only after those files are frozen, download and preprocess the new sealed test scenarios 17–26:
 

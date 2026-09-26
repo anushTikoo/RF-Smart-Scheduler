@@ -1,5 +1,10 @@
 # Contextual-Bandit Reward Function
 
+> V2 keeps the same three objectives but expresses missed-opportunity cost as
+> a rate. At the 500 us dwell, `20.0 * dwell_seconds = 0.01` is charged for a
+> missed opportunity. The fixed `0.1` described below is the historical 5 ms
+> V1 equivalent. V2 reports scan misses and detector false negatives separately.
+
 The environment now implements the three requested objectives as:
 
 ```text

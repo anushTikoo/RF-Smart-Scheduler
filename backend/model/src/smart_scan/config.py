@@ -6,6 +6,7 @@ from typing import Any
 import yaml
 
 from smart_scan.env.scan_env import ReceiverConfig, RewardConfig
+from smart_scan.features.context import BandContextConfig
 
 
 DEFAULT_CONFIG_PATH = Path("configs/micro.yaml")
@@ -42,6 +43,21 @@ def reward_config(payload: dict[str, Any]) -> RewardConfig:
             reward.get("acquisition_delay_weight_per_s", 1.0)
         ),
         miss_penalty=float(reward.get("miss_penalty", 0.1)),
+        missed_opportunity_penalty_per_s=(
+            float(reward["missed_opportunity_penalty_per_s"])
+            if "missed_opportunity_penalty_per_s" in reward
+            else None
+        ),
+    )
+
+
+def context_config(payload: dict[str, Any]) -> BandContextConfig:
+    context = payload.get("context", {})
+    return BandContextConfig(
+        version=str(context.get("version", "v1")),
+        predictor_enabled=bool(context.get("predictor_enabled", True)),
+        pulse_count_reference=float(context.get("pulse_count_reference", 128.0)),
+        no_hit_reference=float(context.get("no_hit_reference", 5.0)),
     )
 
 
@@ -86,6 +102,10 @@ def linucb_kwargs(payload: dict[str, Any]) -> dict[str, Any]:
         "uncertainty_weight",
         "coverage_bonus_weight",
         "shared_model",
+        "context_version",
+        "predictor_enabled",
+        "pulse_count_reference",
+        "no_hit_reference",
     }
     result = {key: values[key] for key in allowed if key in values}
     if "max_revisit_factor" not in result:

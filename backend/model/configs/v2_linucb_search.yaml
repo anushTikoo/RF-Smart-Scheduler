@@ -1,16 +1,6 @@
-# Compact, explicit search. Every candidate is trained on all 30 train files.
-# The three candidates can run in parallel; learning within each candidate
-# remains sequential so its state persists across all training scenarios.
+# Exactly three V2 candidates. All share one band-invariant LinUCB model.
 candidates:
-  - name: balanced
-    alpha: 1.0
-    regularization: 1.0
-    min_revisit_factor: 0.5
-    max_revisit_factor: 3.0
-    uncertainty_weight: 0.75
-    coverage_bonus_weight: 1.0
-    shared_model: true
-  - name: lower_exploration
+  - name: v2_core
     alpha: 0.5
     regularization: 1.0
     min_revisit_factor: 0.5
@@ -18,11 +8,23 @@ candidates:
     uncertainty_weight: 0.75
     coverage_bonus_weight: 1.0
     shared_model: true
-  - name: higher_exploration
-    alpha: 1.5
+    predictor_enabled: false
+  - name: v2_predictive
+    alpha: 0.5
     regularization: 1.0
     min_revisit_factor: 0.5
     max_revisit_factor: 3.0
     uncertainty_weight: 0.75
     coverage_bonus_weight: 1.0
     shared_model: true
+    predictor_enabled: true
+  - name: v2_predictive_balanced
+    alpha: 1.0
+    regularization: 1.0
+    min_revisit_factor: 0.5
+    max_revisit_factor: 3.0
+    uncertainty_weight: 0.75
+    coverage_bonus_weight: 1.0
+    shared_model: true
+    predictor_enabled: true
+

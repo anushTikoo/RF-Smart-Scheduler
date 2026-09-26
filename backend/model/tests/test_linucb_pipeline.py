@@ -5,7 +5,7 @@ import numpy as np
 from smart_scan.data.synthetic import make_synthetic_episode
 from smart_scan.env.scan_env import ReceiverConfig, RewardConfig, ScanEnvironment
 from smart_scan.evaluation.run import run_episode
-from smart_scan.linucb_pipeline import train_validate_select
+from smart_scan.linucb_pipeline import train_linucb, train_validate_select
 from smart_scan.schedulers.linucb import LinUCBScheduler
 
 
@@ -83,16 +83,18 @@ def test_train_validate_selection_produces_frozen_artifacts(tmp_path) -> None:
         receiver=ReceiverConfig(),
         reward=RewardConfig(),
         bootstrap_samples=20,
+        jobs=2,
     )
     assert selection["train_episode_count"] == 2
     assert selection["validation_episode_count"] == 1
     assert selection["test_data_accessed"] is False
+    assert selection["parallel_jobs"] == 2
     assert (output / "frozen_linucb.npz").is_file()
     assert (output / "frozen_config.yaml").is_file()
     assert (output / "frozen_training_history.csv").is_file()
     assert (output / "frozen_training_history.json").is_file()
     assert (output / "selection.json").is_file()
-    assert (
+    assert not (
         output
         / "candidates"
         / "candidate_a"
@@ -100,3 +102,65 @@ def test_train_validate_selection_produces_frozen_artifacts(tmp_path) -> None:
         / "traces"
         / "validation_linucb.csv"
     ).is_file()
+    assert (
+        output
+        / "selected_validation"
+        / "traces"
+        / "validation_linucb.csv"
+    ).is_file()
+    assert (
+        output
+        / "selected_validation"
+        / "traces"
+        / "validation_round_robin.csv"
+    ).is_file()
+
+
+def test_train_linucb_resumes_completed_scenarios(tmp_path) -> None:
+    episode_path = tmp_path / "train.npz"
+    episode = make_synthetic_episode(
+        num_steps=25, num_bands=4, num_emitters=2, seed=7
+    )
+    episode.save(episode_path)
+    checkpoint = tmp_path / "linucb.npz"
+    options = {"shared_model": True, "alpha": 1.0, "regularization": 1.0}
+
+    first = train_linucb(
+        [episode_path],
+        output_path=checkpoint,
+        receiver=ReceiverConfig(),
+        reward=RewardConfig(),
+        linucb_options=options,
+    )
+    resumed = train_linucb(
+        [episode_path],
+        output_path=checkpoint,
+        receiver=ReceiverConfig(),
+        reward=RewardConfig(),
+        linucb_options=options,
+    )
+
+    assert first.num_updates == episode.num_steps
+    assert resumed.num_updates == episode.num_steps
+
+
+def test_v2_checkpoint_rejects_different_receiver_geometry(tmp_path) -> None:
+    episode = make_synthetic_episode(
+        num_steps=20, num_bands=20, num_emitters=2, seed=8
+    )
+    episode.time_bin_s = 0.0005
+    scheduler = LinUCBScheduler(
+        shared_model=True,
+        context_version="v2",
+        predictor_enabled=False,
+        pulse_count_reference=10.0,
+    )
+    run_episode(episode, scheduler)
+    checkpoint = scheduler.save(tmp_path / "v2.npz")
+    incompatible = make_synthetic_episode(
+        num_steps=20, num_bands=20, num_emitters=2, seed=9
+    )
+    incompatible.time_bin_s = 0.001
+    frozen = LinUCBScheduler.load(checkpoint)
+    with np.testing.assert_raises_regex(ValueError, "geometry mismatch"):
+        run_episode(incompatible, frozen)

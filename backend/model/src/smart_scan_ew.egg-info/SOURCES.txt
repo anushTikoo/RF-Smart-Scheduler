@@ -18,6 +18,8 @@ src/smart_scan/evaluation/__init__.py
 src/smart_scan/evaluation/aggregate.py
 src/smart_scan/evaluation/fom.py
 src/smart_scan/evaluation/run.py
+src/smart_scan/features/__init__.py
+src/smart_scan/features/context.py
 src/smart_scan/prediction/__init__.py
 src/smart_scan/prediction/next_pulse.py
 src/smart_scan/schedulers/__init__.py

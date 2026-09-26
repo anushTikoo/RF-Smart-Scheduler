@@ -9,6 +9,9 @@ from smart_scan.env.scan_env import ScanEnvironment, Transition
 
 class Scheduler(ABC):
     name = "scheduler"
+    # DQN consumes flattened state vectors. LinUCB and the baseline schedulers
+    # operate directly on the environment and should not pay to build them.
+    requires_state_vector = False
 
     def reset(self, env: ScanEnvironment, seed: int = 0) -> None:
         self.rng = np.random.default_rng(seed)
@@ -59,10 +62,7 @@ def revisit_candidate_mask(
         raise ValueError("min_revisit_factor must be positive and no greater than max")
     if uncertainty_weight < 0:
         raise ValueError("uncertainty_weight cannot be negative")
-    prediction = env.next_pulse_predictor.band_scores(
-        env.step_index * env.episode.time_bin_s,
-        env.episode.time_bin_s,
-    )
+    prediction = env.prediction_scores()
     uncertainty = 1.0 / np.sqrt(1.0 + env.visit_count.astype(np.float64))
     interest = np.maximum.reduce(
         [
@@ -103,10 +103,7 @@ def coverage_urgency(
             dtype=np.float64,
         )
     else:
-        prediction = env.next_pulse_predictor.band_scores(
-            env.step_index * env.episode.time_bin_s,
-            env.episode.time_bin_s,
-        )
+        prediction = env.prediction_scores()
         uncertainty = 1.0 / np.sqrt(1.0 + env.visit_count.astype(np.float64))
         interest = np.maximum.reduce(
             [

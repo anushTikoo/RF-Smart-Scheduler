@@ -6,6 +6,7 @@ from smart_scan.data.episode import Episode
 from smart_scan.data.preprocess import pulse_train_to_episode
 from smart_scan.data.synthetic import make_synthetic_episode
 from smart_scan.env.scan_env import ReceiverConfig, RewardConfig, ScanEnvironment
+from smart_scan.features.context import BandContextConfig
 
 
 def _dense_episode(pulse_count: np.ndarray, emitter_presence: np.ndarray) -> Episode:
@@ -157,3 +158,77 @@ def test_earlier_first_intercept_has_lower_acquisition_delay_cost() -> None:
     assert early_summary["average_first_intercept_delay_s"] == 0.0
     assert late_summary["average_first_intercept_delay_s"] == 0.01
     assert early_summary["total_reward"] > late_summary["total_reward"]
+
+
+def test_v2_context_is_causal_band_invariant_and_compact() -> None:
+    episode = make_synthetic_episode(num_steps=30, num_bands=20, num_emitters=3)
+    env = ScanEnvironment(
+        episode,
+        context=BandContextConfig(version="v2", predictor_enabled=False),
+    )
+    contexts = env.band_contexts()
+    assert contexts.shape == (20, 6)
+    assert env.context_feature_names == (
+        "bias",
+        "time_since_visit",
+        "observed_hit_ewma",
+        "previous_observed_pulse_count",
+        "consecutive_no_hits",
+        "learned_periodicity",
+    )
+    # With no observations, absolute band number must not change the context.
+    assert np.allclose(contexts, contexts[0])
+    assert env.next_pulse_predictor is None
+
+
+def test_missed_opportunity_penalty_is_time_normalized() -> None:
+    reward = RewardConfig(missed_opportunity_penalty_per_s=20.0)
+    fast = _dense_episode(
+        np.asarray([[0, 1]]), np.asarray([[[False], [True]]])
+    )
+    fast.time_bin_s = 0.0005
+    slow = _dense_episode(
+        np.asarray([[0, 1]]), np.asarray([[[False], [True]]])
+    )
+    slow.time_bin_s = 0.005
+    assert np.isclose(ScanEnvironment(fast, reward=reward).step(0).miss_penalty, 0.01)
+    assert np.isclose(ScanEnvironment(slow, reward=reward).step(0).miss_penalty, 0.1)
+
+
+def test_zero_latency_never_loses_boundary_pulse() -> None:
+    data = np.asarray([[0.0, 750.0, 1.0, 0.0, -80.0]], dtype=np.float32)
+    episode = pulse_train_to_episode(
+        data,
+        np.asarray([0]),
+        frequency_min_mhz=500.0,
+        frequency_max_mhz=1500.0,
+        bandwidth_mhz=500.0,
+        dwell_ms=0.5,
+    )
+    env = ScanEnvironment(episode, receiver=ReceiverConfig())
+    transition = env.step(0)
+    assert transition.detected_pulses == 1
+    assert env.pulses_lost_to_latency == 0
+
+
+def test_v2_context_is_equivariant_to_band_permutation() -> None:
+    episode = make_synthetic_episode(num_steps=20, num_bands=5, num_emitters=2)
+    config = BandContextConfig(
+        version="v2", predictor_enabled=False, pulse_count_reference=10.0
+    )
+    original = ScanEnvironment(episode, context=config)
+    original.last_visit[:] = np.asarray([0, 1, 2, 3, 4])
+    original.step_index = 8
+    original.ewma_hit[:] = np.asarray([0.1, 0.2, 0.3, 0.4, 0.5])
+    original.last_pulse_count[:] = np.asarray([1, 2, 3, 4, 5])
+    original.consecutive_no_hits[:] = np.asarray([0, 1, 2, 3, 4])
+    expected = original.band_contexts()
+
+    permutation = np.asarray([3, 0, 4, 1, 2])
+    permuted = ScanEnvironment(episode, context=config)
+    permuted.last_visit[:] = original.last_visit[permutation]
+    permuted.step_index = original.step_index
+    permuted.ewma_hit[:] = original.ewma_hit[permutation]
+    permuted.last_pulse_count[:] = original.last_pulse_count[permutation]
+    permuted.consecutive_no_hits[:] = original.consecutive_no_hits[permutation]
+    assert np.allclose(permuted.band_contexts(), expected[permutation])

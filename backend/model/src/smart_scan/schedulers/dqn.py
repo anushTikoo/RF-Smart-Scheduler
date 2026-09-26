@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+# LEGACY ONLY: retained to reproduce V1 experiments. The V2 entry points,
+# candidate search, validation, final test, and reports never import this module.
+
 from collections import deque
 from pathlib import Path
 
@@ -35,6 +38,7 @@ class QNetwork(nn.Module if nn is not None else object):  # type: ignore[misc]
 
 class DQNScheduler(Scheduler):
     name = "dqn"
+    requires_state_vector = True
 
     def __init__(
         self,
