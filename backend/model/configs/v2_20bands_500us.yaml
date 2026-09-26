@@ -1,0 +1,36 @@
+schema_version: 2
+seed: 42
+receiver:
+  frequency_min_mhz: 500.0
+  frequency_max_mhz: 18000.0
+  bandwidth_mhz: 875.0
+  dwell_ms: 0.5
+  amplitude_threshold_db: -120.0
+  detection_probability: 1.0
+  false_alarm_probability: 0.0
+  decision_latency_us: 0.0
+  retune_time_us: 0.0
+  settling_time_us: 0.0
+context:
+  version: v2
+  predictor_enabled: true
+  pulse_count_reference: train_p95
+  no_hit_reference: 5.0
+reward:
+  # Equivalent to V1's 0.1 cost per 5 ms, but invariant to dwell length.
+  pulse_intercept_weight: 0.01
+  acquisition_delay_weight_per_s: 1.0
+  missed_opportunity_penalty_per_s: 20.0
+history:
+  ewma_alpha: 0.2
+linucb:
+  alpha: 0.5
+  regularization: 1.0
+  min_revisit_factor: 0.5
+  max_revisit_factor: 3.0
+  uncertainty_weight: 0.75
+  coverage_bonus_weight: 1.0
+  shared_model: true
+  context_version: v2
+  predictor_enabled: true
+

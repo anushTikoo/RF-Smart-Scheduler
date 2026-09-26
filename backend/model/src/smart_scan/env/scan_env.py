@@ -5,6 +5,7 @@ from dataclasses import dataclass
 import numpy as np
 
 from smart_scan.data.episode import Episode
+from smart_scan.features.context import BandContextConfig, BandContextEncoder
 from smart_scan.prediction.next_pulse import NextPulsePredictor
 
 
@@ -32,6 +33,14 @@ class RewardConfig:
     pulse_intercept_weight: float = 0.01
     acquisition_delay_weight_per_s: float = 1.0
     miss_penalty: float = 0.1
+    missed_opportunity_penalty_per_s: float | None = None
+
+    def missed_opportunity_cost(self, dwell_s: float) -> float:
+        """Return a dwell-normalized cost while retaining V1 compatibility."""
+
+        if self.missed_opportunity_penalty_per_s is not None:
+            return self.missed_opportunity_penalty_per_s * dwell_s
+        return self.miss_penalty
 
 
 @dataclass(slots=True)
@@ -40,6 +49,9 @@ class Transition:
     detected_pulses: int
     detected_emitters: np.ndarray
     miss: bool
+    scan_miss: bool
+    missed_opportunity: bool
+    detector_false_negative: bool
     false_alarm: bool
     switching_distance: float
     interception_reward: float
@@ -59,18 +71,23 @@ class ScanEnvironment:
         episode: Episode,
         receiver: ReceiverConfig | None = None,
         reward: RewardConfig | None = None,
+        context: BandContextConfig | None = None,
         *,
         seed: int = 0,
     ) -> None:
         self.episode = episode
         self.receiver = receiver or ReceiverConfig()
         self.reward_config = reward or RewardConfig()
+        self.context_config = context or BandContextConfig(version="v1")
+        self.context_encoder = BandContextEncoder(self.context_config)
         (
             self.detectable_pulse_count,
             self.detectable_max_amplitude,
             self.detectable_emitter_presence,
         ) = episode.detectable_truth(self.receiver.amplitude_threshold_db)
         self.emitter_count = self.detectable_emitter_presence.sum(axis=2, dtype=np.int16)
+        self.emission_exists_by_step = self.detectable_pulse_count.sum(axis=1) > 0
+        self.oracle_best_by_step = np.argmax(self.emitter_count, axis=1).astype(np.int16)
         observable_by_step = self.detectable_emitter_presence.any(axis=1)
         self.first_observable_step = np.full(episode.num_emitters, -1, dtype=np.int32)
         for emitter in range(episode.num_emitters):
@@ -93,12 +110,21 @@ class ScanEnvironment:
             self.reward_config.miss_penalty,
         ) < 0:
             raise ValueError("reward weights cannot be negative")
+        if (
+            self.reward_config.missed_opportunity_penalty_per_s is not None
+            and self.reward_config.missed_opportunity_penalty_per_s < 0
+        ):
+            raise ValueError("missed-opportunity penalty rate cannot be negative")
         self.seed = seed
         self.rng = np.random.default_rng(seed)
-        self.next_pulse_predictor = NextPulsePredictor(episode.num_bands)
-        self.reset()
+        self.next_pulse_predictor = (
+            NextPulsePredictor(episode.num_bands)
+            if self.context_config.predictor_enabled
+            else None
+        )
+        self.reset(return_state=False)
 
-    def reset(self) -> np.ndarray:
+    def reset(self, *, return_state: bool = True) -> np.ndarray | None:
         bands = self.episode.num_bands
         emitters = self.episode.num_emitters
         self.step_index = 0
@@ -108,7 +134,9 @@ class ScanEnvironment:
         self.ewma_hit = np.zeros(bands, dtype=np.float32)
         self.last_pulse_count = np.zeros(bands, dtype=np.float32)
         self.last_amplitude = np.full(bands, -140.0, dtype=np.float32)
-        self.consecutive_misses = np.zeros(bands, dtype=np.float32)
+        self.consecutive_no_hits = np.zeros(bands, dtype=np.float32)
+        # Compatibility alias for legacy DQN and external notebooks.
+        self.consecutive_misses = self.consecutive_no_hits
         self.last_hit_step = np.full(bands, -1, dtype=np.int32)
         self.estimated_period = np.zeros(bands, dtype=np.float32)
         self.period_error = np.ones(bands, dtype=np.float32)
@@ -120,11 +148,15 @@ class ScanEnvironment:
         self.total_switching_distance = 0.0
         self.total_false_alarms = 0
         self.total_misses = 0
+        self.total_scan_misses = 0
+        self.total_detector_false_negatives = 0
+        self.total_selected_active_steps = 0
         self.total_emission_opportunity_steps = 0
         self.total_interception_reward = 0.0
         self.total_acquisition_delay_penalty = 0.0
         self.total_miss_penalty = 0.0
         self.total_eligible_selected_pulses = 0
+        self.total_eligible_selected_steps = 0
         self.total_empty_selected_steps = 0
         self.pulses_lost_to_latency = 0
         self.total_dead_time_s = 0.0
@@ -135,8 +167,16 @@ class ScanEnvironment:
         self.action_log: list[int] = []
         self.reward_log: list[float] = []
         self.rng = np.random.default_rng(self.seed)
-        self.next_pulse_predictor = NextPulsePredictor(self.episode.num_bands)
-        return self.state_vector()
+        self.next_pulse_predictor = (
+            NextPulsePredictor(self.episode.num_bands)
+            if self.context_config.predictor_enabled
+            else None
+        )
+        self._feature_cache_step = -1
+        self._cached_prediction_scores: np.ndarray | None = None
+        self._cached_periodic_due: np.ndarray | None = None
+        self._cached_band_contexts: np.ndarray | None = None
+        return self.state_vector() if return_state else None
 
     @property
     def done(self) -> bool:
@@ -158,7 +198,28 @@ class ScanEnvironment:
         )
         return np.clip(elapsed / max(self.episode.num_steps, 1), 0.0, 1.0)
 
-    def _periodic_due(self) -> np.ndarray:
+    @property
+    def context_feature_names(self) -> tuple[str, ...]:
+        return self.context_encoder.feature_names
+
+    def configure_context(self, context: BandContextConfig) -> None:
+        """Configure the encoder before the first scheduling decision."""
+
+        if self.step_index != 0 or self.action_log:
+            raise RuntimeError("context must be configured before an episode starts")
+        self.context_config = context
+        self.context_encoder = BandContextEncoder(context)
+        self.next_pulse_predictor = (
+            NextPulsePredictor(self.episode.num_bands)
+            if context.predictor_enabled
+            else None
+        )
+        self._feature_cache_step = -1
+
+    def periodicity_scores(self) -> np.ndarray:
+        self._refresh_feature_cache()
+        if self._cached_periodic_due is not None:
+            return self._cached_periodic_due
         elapsed = np.where(
             self.last_hit_step < 0,
             0.0,
@@ -169,9 +230,43 @@ class ScanEnvironment:
         tolerance = np.maximum(1.0, 0.2 * self.estimated_period)
         score = np.zeros(self.episode.num_bands, dtype=np.float32)
         score[valid] = np.exp(-error[valid] / tolerance[valid]) / (1.0 + self.period_error[valid])
+        self._cached_periodic_due = score
         return score
 
+    def _periodic_due(self) -> np.ndarray:
+        """Compatibility alias for coverage helpers."""
+
+        return self.periodicity_scores()
+
+    def _refresh_feature_cache(self) -> None:
+        if self._feature_cache_step == self.step_index:
+            return
+        self._feature_cache_step = self.step_index
+        self._cached_prediction_scores = None
+        self._cached_periodic_due = None
+        self._cached_band_contexts = None
+
+    def prediction_scores(self) -> np.ndarray:
+        """Return per-band anonymous pulse urgency, computed once per dwell."""
+
+        self._refresh_feature_cache()
+        if self.next_pulse_predictor is None:
+            return np.zeros(self.episode.num_bands, dtype=np.float32)
+        if self._cached_prediction_scores is None:
+            self._cached_prediction_scores = self.next_pulse_predictor.band_scores(
+                self.step_index * self.episode.time_bin_s,
+                self.episode.time_bin_s * self.episode.num_bands,
+            )
+        return self._cached_prediction_scores
+
     def band_contexts(self) -> np.ndarray:
+        self._refresh_feature_cache()
+        if self._cached_band_contexts is None:
+            self._cached_band_contexts = self.context_encoder.encode(self)
+        return self._cached_band_contexts
+
+    def _legacy_band_contexts(self) -> np.ndarray:
+        self._refresh_feature_cache()
         bands = self.episode.num_bands
         indices = np.arange(bands, dtype=np.float32)
         denominator = max(bands - 1, 1)
@@ -181,10 +276,7 @@ class ScanEnvironment:
         amplitude_feature = np.clip((self.last_amplitude + 140.0) / 140.0, 0.0, 1.0)
         miss_feature = np.clip(self.consecutive_misses / 20.0, 0.0, 1.0)
         phase = 2.0 * np.pi * self.step_index / max(self.episode.num_steps, 1)
-        prediction_score = self.next_pulse_predictor.band_scores(
-            self.step_index * self.episode.time_bin_s,
-            self.episode.time_bin_s,
-        )
+        prediction_score = self.prediction_scores()
         contexts = np.column_stack(
             [
                 np.ones(bands, dtype=np.float32),
@@ -219,7 +311,7 @@ class ScanEnvironment:
     def oracle_action(self) -> int:
         if self.done:
             return 0
-        return int(np.argmax(self.emitter_count[self.step_index]))
+        return int(self.oracle_best_by_step[self.step_index])
 
     def _observe_sparse_cell(
         self, time_index: int, band_index: int, switching: bool
@@ -247,7 +339,13 @@ class ScanEnvironment:
             ) / 1e6
         start_s = time_index * self.episode.time_bin_s
         ready_s = start_s + dead_time_s
-        ready_mask = times >= ready_s
+        # Exact zero dead time must never lose a pulse to floating-point noise at
+        # a bin boundary. Non-zero hardware delay retains the strict time test.
+        ready_mask = (
+            np.ones(len(times), dtype=bool)
+            if dead_time_s == 0.0
+            else times >= ready_s - np.finfo(np.float64).eps * 8
+        )
         latency_loss = int((~ready_mask).sum())
         times = times[ready_mask]
         amplitudes = amplitudes[ready_mask]
@@ -311,9 +409,11 @@ class ScanEnvironment:
                 if detected
                 else np.zeros(self.episode.num_emitters, dtype=bool)
             )
+        selected_emission_exists = bool(self.detectable_pulse_count[t, action] > 0)
         detectable = eligible_count > 0
         false_alarm = bool(
-            not detectable and self.rng.random() < self.receiver.false_alarm_probability
+            not selected_emission_exists
+            and self.rng.random() < self.receiver.false_alarm_probability
         )
         denominator = max(self.episode.num_bands - 1, 1)
         switching = abs(action - self.current_band) / denominator
@@ -337,12 +437,17 @@ class ScanEnvironment:
             * self.episode.time_bin_s
         )
 
-        # Reward objective 3: a miss is a false negative at the action level.
-        # It is deliberately not the same as a false alarm. With the default
-        # ideal detector, false alarms remain zero by construction.
-        emission_exists = bool(self.detectable_pulse_count[t].sum() > 0)
-        miss = bool(emission_exists and pulses == 0)
-        miss_penalty = self.reward_config.miss_penalty * int(miss)
+        # Reward objective 3: a missed opportunity means activity existed in the
+        # spectrum but this action produced no interception. It is not a false
+        # alarm, and is separated below from a detector false negative.
+        emission_exists = bool(self.emission_exists_by_step[t])
+        scan_miss = bool(emission_exists and not selected_emission_exists)
+        detector_false_negative = bool(detectable and pulses == 0)
+        missed_opportunity = bool(emission_exists and pulses == 0)
+        miss = missed_opportunity  # V1 output alias.
+        miss_penalty = self.reward_config.missed_opportunity_cost(
+            self.episode.time_bin_s
+        ) * int(missed_opportunity)
         reward = interception_reward - acquisition_delay_penalty - miss_penalty
 
         hit = float(pulses > 0 or false_alarm)
@@ -352,7 +457,9 @@ class ScanEnvironment:
         self.visit_count[action] += 1
         self.last_pulse_count[action] = pulses
         self.last_amplitude[action] = amplitude if np.isfinite(amplitude) else -140.0
-        self.consecutive_misses[action] = 0 if hit else self.consecutive_misses[action] + 1
+        self.consecutive_no_hits[action] = (
+            0 if hit else self.consecutive_no_hits[action] + 1
+        )
         if pulses > 0:
             previous = int(self.last_hit_step[action])
             if previous >= 0:
@@ -379,26 +486,38 @@ class ScanEnvironment:
         self.total_switching_distance += switching
         self.total_false_alarms += int(false_alarm)
         self.total_misses += int(miss)
+        self.total_scan_misses += int(scan_miss)
+        self.total_detector_false_negatives += int(detector_false_negative)
+        self.total_selected_active_steps += int(selected_emission_exists)
         self.total_emission_opportunity_steps += int(emission_exists)
         self.total_interception_reward += float(interception_reward)
         self.total_acquisition_delay_penalty += float(acquisition_delay_penalty)
         self.total_miss_penalty += float(miss_penalty)
         self.total_eligible_selected_pulses += eligible_count
+        self.total_eligible_selected_steps += int(detectable)
         self.total_empty_selected_steps += int(not detectable)
         self.pulses_lost_to_latency += latency_loss
         self.total_dead_time_s += min(dead_time_s, self.episode.time_bin_s)
         self.action_log.append(action)
         self.reward_log.append(float(reward))
-        # The prediction feature uses only observed times and bands. Dataset
-        # emitter identities remain simulator truth for reward/evaluation and
-        # never enter the contextual feature path.
-        self.next_pulse_predictor.update(event_times, event_bands)
+        # V2 updates once per selected dwell, not once per pulse. It receives
+        # only the observed band/activity flag; labels and hidden truth never
+        # enter the prediction or context path.
+        if self.next_pulse_predictor is not None:
+            self.next_pulse_predictor.update_dwell(
+                observation_time_s=(t + 1) * self.episode.time_bin_s,
+                band_index=action,
+                active=bool(pulses > 0),
+            )
         self.step_index += 1
         return Transition(
             reward=float(reward),
             detected_pulses=pulses,
             detected_emitters=emitters,
             miss=miss,
+            scan_miss=scan_miss,
+            missed_opportunity=missed_opportunity,
+            detector_false_negative=detector_false_negative,
             false_alarm=false_alarm,
             switching_distance=float(switching),
             interception_reward=float(interception_reward),
@@ -431,6 +550,7 @@ class ScanEnvironment:
         return {
             "total_reward": self.total_reward,
             "average_reward": self.total_reward / max(self.episode.num_steps, 1),
+            "average_reward_per_s": self.total_reward / max(duration, 1e-9),
             "average_interception_reward": self.total_interception_reward
             / max(self.episode.num_steps, 1),
             "average_acquisition_delay_penalty": self.total_acquisition_delay_penalty
@@ -440,6 +560,17 @@ class ScanEnvironment:
             "misses": float(self.total_misses),
             "miss_rate": self.total_misses
             / max(self.total_emission_opportunity_steps, 1),
+            "missed_opportunities": float(self.total_misses),
+            "missed_opportunity_rate": self.total_misses
+            / max(self.total_emission_opportunity_steps, 1),
+            "scan_misses": float(self.total_scan_misses),
+            "scan_miss_rate": self.total_scan_misses
+            / max(self.total_emission_opportunity_steps, 1),
+            "correct_scan_rate": self.total_selected_active_steps
+            / max(self.total_emission_opportunity_steps, 1),
+            "detector_false_negatives": float(self.total_detector_false_negatives),
+            "detector_false_negative_rate": self.total_detector_false_negatives
+            / max(self.total_eligible_selected_steps, 1),
             "pulse_interception_ratio": self.total_detected_pulses / max(observable_pulses, 1),
             "emitter_event_interception_ratio": self.total_detected_events / max(observable_events, 1),
             "unique_emitter_coverage": int((self.detected_emitters_ever & observable_emitters).sum())
@@ -460,5 +591,18 @@ class ScanEnvironment:
             "pulses_lost_to_latency": float(self.pulses_lost_to_latency),
             "receiver_dead_time_s": self.total_dead_time_s,
             "oracle_band_accuracy": self.oracle_correct / max(self.oracle_opportunities, 1),
-            **self.next_pulse_predictor.metrics(),
+            **(
+                self.next_pulse_predictor.metrics()
+                if self.next_pulse_predictor is not None
+                else {
+                    "next_active_dwell_timing_mae_s": 0.0,
+                    "next_active_band_accuracy": 0.0,
+                    "next_active_prediction_count": 0.0,
+                    "next_active_prediction_coverage": 0.0,
+                    "predictor_dwell_updates": 0.0,
+                    "intercept_time_prediction_mae_s": 0.0,
+                    "next_pulse_band_accuracy": 0.0,
+                    "next_pulse_prediction_count": 0.0,
+                }
+            ),
         }

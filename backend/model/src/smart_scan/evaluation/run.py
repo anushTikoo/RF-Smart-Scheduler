@@ -3,12 +3,14 @@ from __future__ import annotations
 import csv
 import json
 from pathlib import Path
+from time import perf_counter_ns
 from typing import Callable
 
 import numpy as np
 
 from smart_scan.data.episode import Episode
 from smart_scan.env.scan_env import ReceiverConfig, RewardConfig, ScanEnvironment
+from smart_scan.features.context import BandContextConfig
 from smart_scan.schedulers.base import Scheduler
 from smart_scan.schedulers.baselines import (
     GreedyScheduler,
@@ -21,10 +23,15 @@ from smart_scan.schedulers.linucb import LinUCBScheduler
 
 METRICS = [
     "average_reward",
+    "average_reward_per_s",
     "average_interception_reward",
     "average_acquisition_delay_penalty",
     "average_miss_penalty",
     "miss_rate",
+    "missed_opportunity_rate",
+    "scan_miss_rate",
+    "correct_scan_rate",
+    "detector_false_negative_rate",
     "pulse_interception_ratio",
     "emitter_event_interception_ratio",
     "unique_emitter_coverage",
@@ -41,6 +48,16 @@ METRICS = [
     "intercept_time_prediction_mae_s",
     "next_pulse_band_accuracy",
     "next_pulse_prediction_count",
+    "next_active_dwell_timing_mae_s",
+    "next_active_band_accuracy",
+    "next_active_prediction_count",
+    "next_active_prediction_coverage",
+    "predictor_dwell_updates",
+    "scheduler_decision_mean_s",
+    "scheduler_decision_p95_s",
+    "scheduler_decision_p99_s",
+    "scheduler_decision_max_s",
+    "scheduler_deadline_miss_rate",
 ]
 
 
@@ -80,36 +97,49 @@ def run_episode(
     trace_path: str | Path | None = None,
     action_callback: Callable[[dict[str, float | int | str | bool]], None]
     | None = None,
+    context: BandContextConfig | None = None,
 ) -> dict[str, float | str | int]:
-    env = ScanEnvironment(episode, receiver=receiver, reward=reward, seed=seed)
+    env = ScanEnvironment(
+        episode, receiver=receiver, reward=reward, context=context, seed=seed
+    )
     scheduler.reset(env, seed=seed)
-    state = env.reset()
+    needs_state = scheduler.requires_state_vector
+    empty_state = np.empty(0, dtype=np.float32)
+    state = env.state_vector() if needs_state else empty_state
     trace_rows: list[dict[str, float | int | str | bool]] = []
+    decision_times_s: list[float] = []
     while not env.done:
         step = env.step_index
+        decision_start = perf_counter_ns()
         action = scheduler.select_action(env)
+        decision_s = (perf_counter_ns() - decision_start) / 1e9
+        decision_times_s.append(decision_s)
         transition = env.step(action)
-        action_record = {
-            "scheduler": scheduler.name,
-            "step": step,
-            "time_start_s": step * episode.time_bin_s,
-            "band_index": action,
-            "frequency_low_mhz": float(episode.band_edges_mhz[action]),
-            "frequency_high_mhz": float(episode.band_edges_mhz[action + 1]),
-            "detected_pulses": transition.detected_pulses,
-            "miss": transition.miss,
-            "false_alarm": transition.false_alarm,
-            "reward": transition.reward,
-            "interception_reward": transition.interception_reward,
-            "acquisition_delay_penalty": transition.acquisition_delay_penalty,
-            "miss_penalty": transition.miss_penalty,
-            "switching_distance": transition.switching_distance,
-        }
-        if trace_path is not None:
-            trace_rows.append(action_record)
-        if action_callback is not None:
-            action_callback(action_record)
-        next_state = env.state_vector()
+        if trace_path is not None or action_callback is not None:
+            action_record = {
+                "scheduler": scheduler.name,
+                "step": step,
+                "time_start_s": step * episode.time_bin_s,
+                "band_index": action,
+                "frequency_low_mhz": float(episode.band_edges_mhz[action]),
+                "frequency_high_mhz": float(episode.band_edges_mhz[action + 1]),
+                "detected_pulses": transition.detected_pulses,
+                "miss": transition.miss,
+                "scan_miss": transition.scan_miss,
+                "missed_opportunity": transition.missed_opportunity,
+                "detector_false_negative": transition.detector_false_negative,
+                "false_alarm": transition.false_alarm,
+                "reward": transition.reward,
+                "interception_reward": transition.interception_reward,
+                "acquisition_delay_penalty": transition.acquisition_delay_penalty,
+                "miss_penalty": transition.miss_penalty,
+                "switching_distance": transition.switching_distance,
+            }
+            if trace_path is not None:
+                trace_rows.append(action_record)
+            if action_callback is not None:
+                action_callback(action_record)
+        next_state = env.state_vector() if needs_state else empty_state
         scheduler.observe(env, state, action, transition, next_state)
         state = next_state
     if trace_path is not None:
@@ -119,7 +149,22 @@ def run_episode(
             writer = csv.DictWriter(stream, fieldnames=list(trace_rows[0]))
             writer.writeheader()
             writer.writerows(trace_rows)
-    return {"scheduler": scheduler.name, "seed": seed, **env.summary()}
+    timings = np.asarray(decision_times_s, dtype=np.float64)
+    timing_summary = {
+        "scheduler_decision_mean_s": float(timings.mean()) if len(timings) else 0.0,
+        "scheduler_decision_p95_s": float(np.quantile(timings, 0.95)) if len(timings) else 0.0,
+        "scheduler_decision_p99_s": float(np.quantile(timings, 0.99)) if len(timings) else 0.0,
+        "scheduler_decision_max_s": float(timings.max()) if len(timings) else 0.0,
+        "scheduler_deadline_miss_rate": float(
+            np.mean(timings > episode.time_bin_s)
+        ) if len(timings) else 0.0,
+    }
+    return {
+        "scheduler": scheduler.name,
+        "seed": seed,
+        **env.summary(),
+        **timing_summary,
+    }
 
 
 def benchmark(

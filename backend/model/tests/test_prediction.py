@@ -19,3 +19,13 @@ def test_periodic_next_pulse_prediction() -> None:
     metrics = predictor.metrics()
     assert metrics["intercept_time_prediction_mae_s"] == 0.0
     assert metrics["next_pulse_band_accuracy"] == 1.0
+
+
+def test_v2_predictor_updates_once_per_dwell() -> None:
+    predictor = NextPulsePredictor(num_bands=2, min_intervals=1, history_size=4)
+    predictor.update_dwell(observation_time_s=0.001, band_index=0, active=True)
+    predictor.update_dwell(observation_time_s=0.002, band_index=0, active=False)
+    predictor.update_dwell(observation_time_s=0.003, band_index=0, active=True)
+    assert predictor.dwell_updates == 3
+    assert predictor.active_observations == 2
+    assert list(predictor.times[0]) == [0.001, 0.003]

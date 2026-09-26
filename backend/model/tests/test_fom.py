@@ -8,5 +8,6 @@ def test_figures_of_merit_maps_named_metrics() -> None:
     report = figures_of_merit({"summary": [scheduler]})
     row = report["figures_of_merit"][0]
     assert row["probability_of_detection"] == 0.25
-    assert row["next_pulse_band_prediction_accuracy_percent"] == 25.0
-    assert row["average_intercept_time_error_s"] == 0.25
+    assert row["next_active_band_prediction_accuracy_percent"] == 25.0
+    assert row["next_active_dwell_timing_mae_s"] == 0.25
+    assert row["correct_scan_rate"] == 0.25
