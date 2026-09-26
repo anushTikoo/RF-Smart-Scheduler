@@ -71,7 +71,8 @@ export default function RadarScanner({
   metrics = {},
   isScanning = false,
   isCompleted = false,
-  hasDataset = false
+  hasDataset = false,
+  showCircularScan = false,
 }) {
   const isAdaptive = type === 'adaptive';
   const bandInfo = currentBand ? (BAND_CONFIG.find((b) => b.id === currentBand) || null) : null;
@@ -104,37 +105,39 @@ export default function RadarScanner({
   const wedgePathOuter = bandInfo ? getSectorPath(200, 200, RADAR_RADIUS, bandInfo.startDeg, bandInfo.endDeg) : null;
 
   return (
-    <div className="bg-white rounded-2xl shadow-[0_2px_10px_rgba(0,0,0,0.04)] border border-slate-200 p-5 sm:p-6 flex flex-col justify-between items-center transition-all">
-      {/* Card Header: Relevant Domain Icons (No Blinking Dots) */}
-      <div className="w-full flex items-center justify-between pb-3 border-b border-slate-100">
-        <div className="flex items-center gap-2.5">
+    <div className={`bg-white rounded-2xl shadow-[0_2px_10px_rgba(0,0,0,0.04)] border border-slate-200 ${
+      !showCircularScan ? 'p-3 sm:p-3.5' : 'p-3.5 sm:p-4'
+    } flex flex-col justify-between items-center transition-all`}>
+      {/* Card Header: Relevant Domain Icons */}
+      <div className="w-full flex items-center justify-between pb-2 border-b border-slate-100">
+        <div className="flex items-center gap-1.5">
           {/* Meaningful Domain Icon representing Adaptive ML vs Open-Loop Fixed Sweep */}
           {isAdaptive ? (
             <span
-              className="material-symbols-outlined text-[22px] text-primary select-none drop-shadow-[0_0_8px_rgba(0,198,215,0.6)]"
+              className="material-symbols-outlined text-[18px] text-primary select-none drop-shadow-[0_0_8px_rgba(0,198,215,0.6)]"
               title="Adaptive ML: Cognitive Band Scheduling (LinUCB Contextual Bandit)"
             >
               neurology
             </span>
           ) : (
             <span
-              className="material-symbols-outlined text-[20px] text-slate-500 select-none"
+              className="material-symbols-outlined text-[16px] text-slate-500 select-none"
               title="Open Loop: Sequential Fixed Round-Robin Sweep"
             >
               sync
             </span>
           )}
-          <div className="flex items-center gap-2">
-            <h2 className="font-label-md text-[13px] font-semibold text-on-surface uppercase tracking-wider">
+          <div className="flex items-center gap-1">
+            <h2 className="font-label-md text-[11px] font-semibold text-on-surface uppercase tracking-wider">
               {title}
             </h2>
           </div>
         </div>
 
-        {/* Scanning Badge on each scanner (Only shown when a dataset is loaded) */}
+        {/* Scanning Badge on each scanner (Micro compact size) */}
         {hasDataset && (
           <div
-            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full font-label-md text-[10px] font-semibold tracking-wider select-none shadow-2xs ${
+            className={`flex items-center gap-1 px-1.5 py-0.5 rounded-md font-label-md text-[8.5px] font-semibold tracking-wide select-none shadow-2xs ${
               isCompleted
                 ? 'bg-blue-50 border border-blue-200 text-blue-700'
                 : isScanning
@@ -143,7 +146,7 @@ export default function RadarScanner({
             }`}
           >
             <span
-              className={`material-symbols-outlined text-[14px] ${
+              className={`material-symbols-outlined text-[10.5px] ${
                 isCompleted
                   ? 'text-blue-600'
                   : isScanning
@@ -159,8 +162,38 @@ export default function RadarScanner({
         )}
       </div>
 
-      {/* Radar SVG Circle with generous perimeter buffer so labels never overlap */}
-      <div className="relative w-64 h-64 sm:w-80 sm:h-80 my-3 sm:my-4 flex items-center justify-center select-none">
+      {/* Visual Scan Presentation: Compact High-Speed Running Status in Live Mode, Circular Radar Wheel in Slow Replay */}
+      {!showCircularScan ? (
+        <div className="w-full my-1.5 py-1 px-2.5 rounded-md bg-slate-50 border border-slate-200/80 flex items-center justify-between gap-1.5 shadow-2xs select-none">
+          <div className="flex items-center gap-1.5">
+            <span className="relative flex h-1.5 w-1.5">
+              {isScanning && (
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              )}
+              <span
+                className={`relative inline-flex rounded-full h-1.5 w-1.5 ${
+                  isCompleted ? 'bg-blue-500' : isScanning ? 'bg-emerald-500' : 'bg-slate-400'
+                }`}
+              ></span>
+            </span>
+            <span className="text-slate-700 font-semibold text-[10px]">
+              {isCompleted
+                ? 'Simulation Complete'
+                : isScanning
+                  ? (isAdaptive ? 'Cognitive Model Running (LinUCB)' : 'Sequential Sweep Running')
+                  : (hasDataset ? 'Simulation Paused' : 'Awaiting Dataset')}
+            </span>
+          </div>
+          <div className="flex items-center gap-1">
+            <span className="text-[9px] font-mono text-slate-500 font-medium">
+              {isScanning ? 'Status: Active (0.5 ms Dwells)' : isCompleted ? 'Status: Completed' : 'Status: Idle'}
+            </span>
+          </div>
+        </div>
+      ) : (
+        <>
+          {/* Radar SVG Circle with generous perimeter buffer so labels never overlap */}
+          <div className="relative w-64 h-64 sm:w-80 sm:h-80 my-3 sm:my-4 flex items-center justify-center select-none">
         <svg
           className="w-full h-full transform -rotate-90 transition-transform duration-500"
           viewBox="0 0 400 400"
@@ -387,23 +420,25 @@ export default function RadarScanner({
           </div>
         )
       )}
+        </>
+      )}
 
       {/* Enlarged Data Points Section: Specific to Receiver View vs Environment View */}
-      <div className="w-full pt-4 border-t border-slate-100 flex flex-col gap-3">
+      <div className={`w-full ${!showCircularScan ? 'pt-2 gap-2' : 'pt-3 gap-2.5'} border-t border-slate-100 flex flex-col`}>
         {viewMode === 'receiver' ? (
           /* Receiver View Metrics: Strictly what the receiver knows (2 cards) */
-          <div className="grid grid-cols-2 gap-2.5 w-full">
+          <div className="grid grid-cols-2 gap-2 w-full">
             {/* Correct Scan Rate = HIT / (HIT + Scan Miss) */}
-            <div className="flex flex-col justify-between p-3.5 rounded-xl bg-slate-50 border border-slate-100 shadow-2xs">
+            <div className={`flex flex-col justify-between ${!showCircularScan ? 'p-2.5' : 'p-3'} rounded-xl bg-slate-50 border border-slate-100 shadow-2xs`}>
               <div className="flex items-center justify-between gap-1 w-full">
-                <span className="font-label-md text-[11px] font-bold text-slate-800 uppercase tracking-wide">
+                <span className="font-label-md text-[10px] font-bold text-slate-800 uppercase tracking-wide">
                   Correct Scan Rate
                 </span>
                 <InfoTooltip formula="HIT / (HIT + Scan Miss)" />
               </div>
-              <div className="mt-2.5 flex items-baseline gap-1.5">
+              <div className="mt-1.5 flex items-baseline gap-1">
                 <span
-                  className={`font-mono text-[24px] sm:text-[26px] font-extrabold tracking-tight leading-none ${
+                  className={`font-mono ${!showCircularScan ? 'text-[20px] sm:text-[22px]' : 'text-[22px] sm:text-[24px]'} font-extrabold tracking-tight leading-none ${
                     isAdaptive ? 'text-primary' : 'text-slate-800'
                   }`}
                 >
@@ -413,16 +448,16 @@ export default function RadarScanner({
             </div>
 
             {/* Average Intercept Rate = Total successful interceptions / Total simulation time */}
-            <div className="flex flex-col justify-between p-3.5 rounded-xl bg-slate-50 border border-slate-100 shadow-2xs">
+            <div className={`flex flex-col justify-between ${!showCircularScan ? 'p-2.5' : 'p-3'} rounded-xl bg-slate-50 border border-slate-100 shadow-2xs`}>
               <div className="flex items-center justify-between gap-1 w-full">
-                <span className="font-label-md text-[11px] font-bold text-slate-800 uppercase tracking-wide">
+                <span className="font-label-md text-[10px] font-bold text-slate-800 uppercase tracking-wide">
                   Average Intercept Rate
                 </span>
                 <InfoTooltip formula="Total successful interceptions / Total simulation time" />
               </div>
-              <div className="mt-2.5 flex items-baseline gap-1.5">
+              <div className="mt-1.5 flex items-baseline gap-1">
                 <span
-                  className={`font-mono text-[24px] sm:text-[26px] font-extrabold tracking-tight leading-none ${
+                  className={`font-mono ${!showCircularScan ? 'text-[20px] sm:text-[22px]' : 'text-[22px] sm:text-[24px]'} font-extrabold tracking-tight leading-none ${
                     isAdaptive ? 'text-primary' : 'text-slate-800'
                   }`}
                 >
@@ -433,18 +468,18 @@ export default function RadarScanner({
           </div>
         ) : (
           /* Environment View Metrics: 4 balanced cards in 2x2 grid */
-          <div className="grid grid-cols-2 gap-2.5 w-full">
+          <div className="grid grid-cols-2 gap-2 w-full">
             {/* Probability of Detection (Pd) = Detected emissions / Total actual emissions */}
-            <div className="flex flex-col justify-between p-3 rounded-xl bg-slate-50 border border-slate-100 shadow-2xs">
+            <div className={`flex flex-col justify-between ${!showCircularScan ? 'p-2' : 'p-2.5'} rounded-xl bg-slate-50 border border-slate-100 shadow-2xs`}>
               <div className="flex items-center justify-between gap-1 w-full">
-                <span className="font-label-md text-[10.5px] font-bold text-slate-800 uppercase tracking-wide">
+                <span className="font-label-md text-[9.5px] font-bold text-slate-800 uppercase tracking-wide">
                   Probability of Detection
                 </span>
                 <InfoTooltip formula="Detected emissions / Total actual emissions" />
               </div>
-              <div className="mt-2 flex items-baseline gap-1.5">
+              <div className="mt-1.5 flex items-baseline gap-1">
                 <span
-                  className={`font-mono text-[20px] sm:text-[22px] font-extrabold tracking-tight leading-none ${
+                  className={`font-mono ${!showCircularScan ? 'text-[18px] sm:text-[20px]' : 'text-[19px] sm:text-[21px]'} font-extrabold tracking-tight leading-none ${
                     isAdaptive ? 'text-primary' : 'text-slate-800'
                   }`}
                 >
@@ -454,16 +489,16 @@ export default function RadarScanner({
             </div>
 
             {/* Average Intercept Rate = Total successful interceptions / Total simulation time */}
-            <div className="flex flex-col justify-between p-3 rounded-xl bg-slate-50 border border-slate-100 shadow-2xs">
+            <div className={`flex flex-col justify-between ${!showCircularScan ? 'p-2' : 'p-2.5'} rounded-xl bg-slate-50 border border-slate-100 shadow-2xs`}>
               <div className="flex items-center justify-between gap-1 w-full">
-                <span className="font-label-md text-[10.5px] font-bold text-slate-800 uppercase tracking-wide">
+                <span className="font-label-md text-[9.5px] font-bold text-slate-800 uppercase tracking-wide">
                   Average Intercept Rate
                 </span>
                 <InfoTooltip formula="Total successful interceptions / Total simulation time" />
               </div>
-              <div className="mt-2 flex items-baseline gap-1.5">
+              <div className="mt-1.5 flex items-baseline gap-1">
                 <span
-                  className={`font-mono text-[20px] sm:text-[22px] font-extrabold tracking-tight leading-none ${
+                  className={`font-mono ${!showCircularScan ? 'text-[18px] sm:text-[20px]' : 'text-[19px] sm:text-[21px]'} font-extrabold tracking-tight leading-none ${
                     isAdaptive ? 'text-primary' : 'text-slate-800'
                   }`}
                 >
@@ -473,16 +508,16 @@ export default function RadarScanner({
             </div>
 
             {/* Average Intercept Delay = Time between emission becoming observable and first receiver detection */}
-            <div className="flex flex-col justify-between p-3 rounded-xl bg-slate-50 border border-slate-100 shadow-2xs">
+            <div className={`flex flex-col justify-between ${!showCircularScan ? 'p-2' : 'p-2.5'} rounded-xl bg-slate-50 border border-slate-100 shadow-2xs`}>
               <div className="flex items-center justify-between gap-1 w-full">
-                <span className="font-label-md text-[10.5px] font-bold text-slate-800 uppercase tracking-wide">
+                <span className="font-label-md text-[9.5px] font-bold text-slate-800 uppercase tracking-wide">
                   Average Intercept Delay
                 </span>
                 <InfoTooltip formula="Time between emission becoming observable and first receiver detection" />
               </div>
-              <div className="mt-2 flex items-baseline gap-1.5">
+              <div className="mt-1.5 flex items-baseline gap-1">
                 <span
-                  className={`font-mono text-[20px] sm:text-[22px] font-extrabold tracking-tight leading-none ${
+                  className={`font-mono ${!showCircularScan ? 'text-[18px] sm:text-[20px]' : 'text-[19px] sm:text-[21px]'} font-extrabold tracking-tight leading-none ${
                     isAdaptive ? 'text-primary' : 'text-slate-800'
                   }`}
                 >
@@ -492,16 +527,16 @@ export default function RadarScanner({
             </div>
 
             {/* Correct Scan Rate = HIT / (HIT + Scan Miss) */}
-            <div className="flex flex-col justify-between p-3 rounded-xl bg-slate-50 border border-slate-100 shadow-2xs">
+            <div className={`flex flex-col justify-between ${!showCircularScan ? 'p-2' : 'p-2.5'} rounded-xl bg-slate-50 border border-slate-100 shadow-2xs`}>
               <div className="flex items-center justify-between gap-1 w-full">
-                <span className="font-label-md text-[10.5px] font-bold text-slate-800 uppercase tracking-wide">
+                <span className="font-label-md text-[9.5px] font-bold text-slate-800 uppercase tracking-wide">
                   Correct Scan Rate
                 </span>
                 <InfoTooltip formula="HIT / (HIT + Scan Miss)" />
               </div>
-              <div className="mt-2 flex items-baseline gap-1.5">
+              <div className="mt-1.5 flex items-baseline gap-1">
                 <span
-                  className={`font-mono text-[20px] sm:text-[22px] font-extrabold tracking-tight leading-none ${
+                  className={`font-mono ${!showCircularScan ? 'text-[18px] sm:text-[20px]' : 'text-[19px] sm:text-[21px]'} font-extrabold tracking-tight leading-none ${
                     isAdaptive ? 'text-primary' : 'text-slate-800'
                   }`}
                 >
@@ -514,12 +549,12 @@ export default function RadarScanner({
 
         {/* Supporting Counters Bar */}
         {viewMode === 'receiver' ? (
-          <div className="grid grid-cols-2 gap-2 w-full pt-1">
-            <div className="flex items-center justify-between px-3 py-1.5 rounded-lg bg-slate-100/70 text-slate-600 font-mono text-[11px]">
+          <div className="grid grid-cols-2 gap-1.5 w-full pt-0.5">
+            <div className="flex items-center justify-between px-2.5 py-1 rounded-md bg-slate-100/70 text-slate-600 font-mono text-[10px]">
               <span>HIT Count:</span>
               <span className="font-bold text-slate-900">{hasDataset ? (metrics.totalHits && metrics.totalHits !== '-' ? metrics.totalHits : (isAdaptive ? 432 : 168)) : '-'}</span>
             </div>
-            <div className="flex items-center justify-between px-3 py-1.5 rounded-lg bg-slate-100/70 text-slate-600 font-mono text-[11px]">
+            <div className="flex items-center justify-between px-2.5 py-1 rounded-md bg-slate-100/70 text-slate-600 font-mono text-[10px]">
               <span>Scan Miss Count:</span>
               <span className="font-bold text-slate-900">
                 {hasDataset ? (metrics.totalScanMisses || metrics.totalMisses || (isAdaptive ? 268 : 532)) : '-'}
@@ -527,17 +562,17 @@ export default function RadarScanner({
             </div>
           </div>
         ) : (
-          <div className="grid grid-cols-3 gap-2 w-full pt-1">
-            <div className="flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-slate-100/70 text-slate-600 font-mono text-[10px] sm:text-[10.5px]">
-              <span>HIT / Detected:</span>
+          <div className="grid grid-cols-3 gap-1.5 w-full pt-0.5">
+            <div className="flex items-center justify-between px-2 py-1 rounded-md bg-slate-100/70 text-slate-600 font-mono text-[9.5px]">
+              <span>HIT / Det.:</span>
               <span className="font-bold text-slate-900">{hasDataset ? (metrics.totalHits && metrics.totalHits !== '-' ? metrics.totalHits : (isAdaptive ? 432 : 168)) : '-'}</span>
             </div>
-            <div className="flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-slate-100/70 text-slate-600 font-mono text-[10px] sm:text-[10.5px]">
+            <div className="flex items-center justify-between px-2 py-1 rounded-md bg-slate-100/70 text-slate-600 font-mono text-[9.5px]">
               <span>Scan Miss:</span>
               <span className="font-bold text-slate-900">{hasDataset ? (metrics.totalScanMisses || metrics.totalMisses || (isAdaptive ? 268 : 532)) : '-'}</span>
             </div>
-            <div className="flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-slate-100/70 text-slate-600 font-mono text-[10px] sm:text-[10.5px]">
-              <span>Total Actual Em.:</span>
+            <div className="flex items-center justify-between px-2 py-1 rounded-md bg-slate-100/70 text-slate-600 font-mono text-[9.5px]">
+              <span>Actual Em.:</span>
               <span className="font-bold text-slate-900">
                 {hasDataset ? (metrics.totalActualEmissions && metrics.totalActualEmissions !== '-' ? metrics.totalActualEmissions : (isAdaptive ? 488 : 408)) : '-'}
               </span>
