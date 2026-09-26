@@ -1,0 +1,16 @@
+{
+  "dataset_id": "alan-turing-institute/turing-synthetic-radar-dataset",
+  "description": "Sealed evaluation set for the frozen 100-scenario production model. These scenarios were selected only after the production checkpoint was frozen and must not be used for tuning.",
+  "files": [
+    {"split": "test", "mode": "stare", "config_id": 37},
+    {"split": "test", "mode": "stare", "config_id": 38},
+    {"split": "test", "mode": "stare", "config_id": 39},
+    {"split": "test", "mode": "stare", "config_id": 40},
+    {"split": "test", "mode": "stare", "config_id": 41},
+    {"split": "test", "mode": "stare", "config_id": 42},
+    {"split": "test", "mode": "stare", "config_id": 43},
+    {"split": "test", "mode": "stare", "config_id": 44},
+    {"split": "test", "mode": "stare", "config_id": 45},
+    {"split": "test", "mode": "stare", "config_id": 46}
+  ]
+}
