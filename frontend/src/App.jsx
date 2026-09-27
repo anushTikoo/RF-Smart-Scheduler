@@ -6,9 +6,14 @@ import RLParametersAccordion from './components/RLParametersAccordion';
 import Toast from './components/Toast';
 import {
   subscribeTelemetry,
+  sendTelemetryCommand,
+  fetchDwellHistory,
+  fetchDatasetInfo,
+  uploadDataset,
+  resetSimulation,
+  fetchConfig,
   TOTAL_SIMULATION_DWELLS,
   DWELL_DURATION_MS,
-  MOCK_120_DWELLS,
 } from './services/telemetryService';
 
 /**
@@ -56,6 +61,10 @@ function dwellToObservation(dwellItem) {
   const endMs = dwellItem.endMs !== undefined ? dwellItem.endMs : dwellItem.dwellIndex * DWELL_DURATION_MS;
   const timeWindow = dwellItem.timeWindow || `${startMs.toFixed(1)}–${endMs.toFixed(1)} ms`;
 
+  const dwellReward = dwellItem.reward !== undefined
+    ? dwellItem.reward
+    : (adapt.reward !== undefined ? adapt.reward : (isHit ? 0.02 : -0.01));
+
   return {
     id: dwellItem.dwellIndex,
     dwellIndex: dwellItem.dwellIndex,
@@ -72,12 +81,14 @@ function dwellToObservation(dwellItem) {
     freqGhz: scanFreq || (0.5 + bandId * 0.875),
     status: result,
     result: result,
+    reward: dwellReward,
     pulsesDetected: adapt.pulsesDetected !== undefined ? adapt.pulsesDetected : (isHit ? 3 : 0),
     isIntercepted: isHit,
     actualBands: envBands,
     actualBand: envBands.length > 0 ? envBands[0] : null,
     actualEmissions: actualEmissionsData,
     actualFreqStr: env.emissionFrequency || (actualEmissionsData.length > 0 ? actualEmissionsData.map((e) => e.freqStr).join(', ') : '-'),
+    hasEmission: envBands.length > 0,
   };
 }
 
@@ -87,15 +98,38 @@ export default function App() {
   const [isScanning, setIsScanning] = useState(false);
   const [isSimulationComplete, setIsSimulationComplete] = useState(false);
   const [loadedDataset, setLoadedDataset] = useState(null);
+  const [totalDwells, setTotalDwells] = useState(TOTAL_SIMULATION_DWELLS);
   const [toastMessage, setToastMessage] = useState(null);
+  const [rlConfig, setRlConfig] = useState(null);
+  const [realTimeSeconds, setRealTimeSeconds] = useState(0);
 
   // Speed and Replay mode states
   const [isSlowReplay, setIsSlowReplay] = useState(false); // false = High-Speed, true = Slower Replay
   const [streamStartIndex, setStreamStartIndex] = useState(0);
   const [scrubberTimeMs, setScrubberTimeMs] = useState(0.5);
 
+  // Live mode real-time stopwatch: increments elapsed seconds while scanning in live mode
+  useEffect(() => {
+    let timer = null;
+    if (isScanning && !isSimulationComplete && !isSlowReplay) {
+      const startTime = Date.now() - realTimeSeconds * 1000;
+      timer = setInterval(() => {
+        setRealTimeSeconds(Math.max(0, (Date.now() - startTime) / 1000));
+      }, 100);
+    }
+    return () => {
+      if (timer) clearInterval(timer);
+    };
+  }, [isScanning, isSimulationComplete, isSlowReplay]);
+
   // Dynamic observations stream for Adaptive ML Scan
   const [observations, setObservations] = useState([]);
+  const observationsRef = useRef([]);
+  const completedLiveStateRef = useRef(null);
+  const hasLiveCompletedRef = useRef(false);
+  useEffect(() => {
+    observationsRef.current = observations;
+  }, [observations]);
 
   // Radar Scanner & Telemetry states
   const [telemetrySource, setTelemetrySource] = useState('initializing');
@@ -107,7 +141,7 @@ export default function App() {
   const [mlInterceptedFreq, setMlInterceptedFreq] = useState(null);
   const [openLoopInterceptedFreq, setOpenLoopInterceptedFreq] = useState(null);
 
-  // Simulation metrics
+  // Simulation metrics - initialized clean to '-'
   const [mlMetrics, setMlMetrics] = useState({
     interceptRate: '-',
     correctScanRate: '-',
@@ -134,7 +168,33 @@ export default function App() {
     totalActualEmissions: '-',
   });
 
-  // Subscribe to live telemetry service
+  // On mount: check if backend already has a dataset loaded and fetch RL config
+  useEffect(() => {
+    let isMounted = true;
+    async function initFromBackend() {
+      try {
+        const info = await fetchDatasetInfo();
+        if (isMounted && info && info.loaded) {
+          setLoadedDataset(info);
+          if (info.total_dwells) {
+            setTotalDwells(info.total_dwells);
+          }
+        }
+        const cfg = await fetchConfig();
+        if (isMounted && cfg) {
+          setRlConfig(cfg);
+        }
+      } catch (err) {
+        // Backend not yet reachable on initial load
+      }
+    }
+    initFromBackend();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  // Subscribe to live telemetry WebSocket stream
   useEffect(() => {
     if (!isScanning) return;
 
@@ -142,13 +202,16 @@ export default function App() {
       (snapshot) => {
         if (!snapshot) return;
         setTelemetrySource(snapshot.source || 'connected');
+        if (snapshot.totalDwells && snapshot.totalDwells > 0) {
+          setTotalDwells((prev) => (prev !== snapshot.totalDwells ? snapshot.totalDwells : prev));
+        }
 
         if (snapshot.isComplete) {
           setIsScanning(false);
           setIsSimulationComplete(true);
           showToast(
             snapshot.completionMessage ||
-              `Simulation completed! All ${TOTAL_SIMULATION_DWELLS} dwell windows (${(TOTAL_SIMULATION_DWELLS * DWELL_DURATION_MS).toFixed(1)} ms) processed.`
+              `Simulation completed! All ${totalDwells} dwell windows (${(totalDwells * DWELL_DURATION_MS).toFixed(1)} ms) processed.`
           );
         }
 
@@ -179,16 +242,33 @@ export default function App() {
           }
         }
 
-        // High-Speed Mode: Populates chunks of 20 dwells all at once
+        // Live Mode (batch): Show the latest 20 dwells window streaming in real-time
         if (snapshot.mode === 'batch' && snapshot.batch) {
           const newEntries = snapshot.batch.map(dwellToObservation).filter(Boolean);
-          setObservations((prev) => [...prev, ...newEntries]);
-          const latestIdx = snapshot.batchEndIndex || (snapshot.batch[snapshot.batch.length - 1]?.dwellIndex);
+          // Set to latest chunk window (do not pile up 58,000 array elements in React state)
+          setObservations(newEntries);
+          const latestIdx = snapshot.dwellIndex || snapshot.batchEndIndex || (snapshot.batch[snapshot.batch.length - 1]?.dwellIndex);
           if (latestIdx) {
             setScrubberTimeMs(Number((latestIdx * DWELL_DURATION_MS).toFixed(1)));
           }
+          if (snapshot.isComplete) {
+            hasLiveCompletedRef.current = true;
+            completedLiveStateRef.current = {
+              observations: newEntries,
+              mlMetrics: snapshot.adaptive?.metrics || null,
+              openLoopMetrics: snapshot.openLoop?.metrics || null,
+              mlCurrentBand: snapshot.adaptive?.currentBand || null,
+              mlInterceptedFreq: snapshot.adaptive?.interceptedFrequency || null,
+              openLoopCurrentBand: snapshot.openLoop?.currentBand || null,
+              openLoopInterceptedFreq: snapshot.openLoop?.interceptedFrequency || null,
+              actualEmissionBand: snapshot.environment?.actualEmissionBand || null,
+              actualEmissionBands: snapshot.environment?.actualEmissionBands || [],
+              emissionFrequency: snapshot.environment?.emissionFrequency || null,
+              scrubberTimeMs: latestIdx ? Number((latestIdx * DWELL_DURATION_MS).toFixed(1)) : 0,
+            };
+          }
         } else if (snapshot.mode === 'slow' && snapshot.singleDwell) {
-          // Slow Mode: Populates 1 dwell at a time for live decision-by-decision circular radar sweep
+          // Slow Replay Mode: Steps 1 dwell at a time for circular radar sweep
           const obsItem = dwellToObservation(snapshot.singleDwell);
           if (obsItem) {
             setObservations((prev) => [...prev, obsItem]);
@@ -201,15 +281,16 @@ export default function App() {
       {
         mode: isSlowReplay ? 'slow' : 'batch',
         batchSize: 20,
-        intervalMs: isSlowReplay ? 750 : 1200,
+        intervalMs: isSlowReplay ? 750 : 250,
         startIndex: streamStartIndex,
+        autoStart: true,
       }
     );
 
     return () => {
       unsubscribe();
     };
-  }, [isScanning, isSlowReplay, streamStartIndex]);
+  }, [isScanning, isSlowReplay, streamStartIndex, totalDwells]);
 
   const showToast = (msg) => {
     setToastMessage(msg);
@@ -218,15 +299,36 @@ export default function App() {
     }, 4000);
   };
 
-  const handleDatasetUpload = (file) => {
-    setLoadedDataset(file);
-    setObservations([]);
-    setIsSimulationComplete(false);
-    setIsSlowReplay(false);
-    setStreamStartIndex(0);
-    setScrubberTimeMs(0.5);
-    setIsScanning(true);
-    showToast(`Dataset loaded: ${file.name}. Starting cognitive RF scan scheduler...`);
+  const handleDatasetUpload = async (file) => {
+    try {
+      showToast(`Uploading dataset ${file.name} to cognitive backend...`);
+      const uploadRes = await uploadDataset(file);
+      const datasetInfo = uploadRes.dataset || uploadRes || {};
+
+      setLoadedDataset({
+        name: file.name,
+        ...datasetInfo,
+      });
+      if (datasetInfo.total_dwells) {
+        setTotalDwells(datasetInfo.total_dwells);
+      }
+      const cfg = await fetchConfig();
+      if (cfg) setRlConfig(cfg);
+
+      setObservations([]);
+      completedLiveStateRef.current = null;
+      hasLiveCompletedRef.current = false;
+      setIsSimulationComplete(false);
+      setIsSlowReplay(false);
+      setStreamStartIndex(0);
+      setScrubberTimeMs(0.5);
+      setRealTimeSeconds(0);
+      setIsScanning(true);
+      showToast(`Dataset loaded: ${file.name}. Starting cognitive RF scan scheduler...`);
+    } catch (err) {
+      console.error('Failed to upload dataset:', err);
+      showToast(`Failed to upload dataset: ${err.message || err}`);
+    }
   };
 
   const handleTogglePause = () => {
@@ -236,6 +338,7 @@ export default function App() {
     }
     const nextState = !isScanning;
     setIsScanning(nextState);
+    sendTelemetryCommand({ command: nextState ? 'resume' : 'pause' });
     showToast(nextState ? 'Simulation resumed.' : 'Simulation paused.');
   };
 
@@ -244,7 +347,9 @@ export default function App() {
     setIsSimulationComplete(false);
     setStreamStartIndex(0);
     setScrubberTimeMs(0.5);
+    setRealTimeSeconds(0);
     setIsScanning(true);
+    sendTelemetryCommand({ command: 'replay' });
     showToast(isSlowReplay ? 'Replaying slow scan from 0.0 ms...' : 'Replaying from 0.0 ms...');
   };
 
@@ -254,64 +359,169 @@ export default function App() {
     setIsSimulationComplete(false);
     setStreamStartIndex(0);
     setScrubberTimeMs(0.5);
+    setRealTimeSeconds(0);
     setIsScanning(true);
+    sendTelemetryCommand({ command: 'set_mode', mode: 'slow' });
+    sendTelemetryCommand({ command: 'set_interval', interval_ms: 750 });
+    sendTelemetryCommand({ command: 'replay' });
     showToast('Starting slow replay with circular radar scans...');
   };
 
-  const handleSwitchToHighSpeed = () => {
+  const handleSwitchToHighSpeed = async () => {
+    // Pause/stop slow replay stream on backend
+    sendTelemetryCommand({ command: 'pause' });
+    sendTelemetryCommand({ command: 'set_mode', mode: 'batch' });
+    sendTelemetryCommand({ command: 'set_interval', interval_ms: 250 });
+
     setIsSlowReplay(false);
-    showToast('Switched to live mode view.');
-  };
+    setIsScanning(false);
+    setIsSimulationComplete(true);
 
-  // Dragging or clicking timeline jumps exactly to that timestamp and starts playing from there
-  const handleScrubberChange = (timeVal) => {
-    const val = parseFloat(timeVal);
-    setScrubberTimeMs(val);
-    const targetDwell = Math.max(1, Math.min(TOTAL_SIMULATION_DWELLS, Math.round(val / DWELL_DURATION_MS)));
-
-    // Immediately reconstruct observations up to this timestamp
-    const historicalObservations = MOCK_120_DWELLS.slice(0, targetDwell).map(dwellToObservation);
-    setObservations(historicalObservations);
-
-    // Update active radar and metrics display
-    const dwell = MOCK_120_DWELLS[targetDwell - 1];
-    if (dwell) {
-      if (dwell.adaptive) {
-        setMlCurrentBand(dwell.adaptive.currentBand);
-        setMlInterceptedFreq(dwell.adaptive.interceptedFrequency);
-        if (dwell.adaptive.metrics) setMlMetrics(dwell.adaptive.metrics);
+    if (completedLiveStateRef.current) {
+      const cached = completedLiveStateRef.current;
+      if (cached.observations && cached.observations.length > 0) {
+        setObservations(cached.observations);
       }
-      if (dwell.openLoop) {
-        setOpenLoopCurrentBand(dwell.openLoop.currentBand);
-        setOpenLoopInterceptedFreq(dwell.openLoop.interceptedFrequency);
-        if (dwell.openLoop.metrics) setOpenLoopMetrics(dwell.openLoop.metrics);
-      }
-      if (dwell.environment) {
-        setActualEmissionBand(dwell.environment.actualEmissionBand);
-        setActualEmissionBands(dwell.environment.actualEmissionBands || [dwell.environment.actualEmissionBand]);
-        setEmissionFrequency(dwell.environment.emissionFrequency);
+      if (cached.mlMetrics) setMlMetrics(cached.mlMetrics);
+      if (cached.openLoopMetrics) setOpenLoopMetrics(cached.openLoopMetrics);
+      if (cached.mlCurrentBand) setMlCurrentBand(cached.mlCurrentBand);
+      if (cached.mlInterceptedFreq) setMlInterceptedFreq(cached.mlInterceptedFreq);
+      if (cached.openLoopCurrentBand) setOpenLoopCurrentBand(cached.openLoopCurrentBand);
+      if (cached.openLoopInterceptedFreq) setOpenLoopInterceptedFreq(cached.openLoopInterceptedFreq);
+      if (cached.actualEmissionBand) setActualEmissionBand(cached.actualEmissionBand);
+      if (cached.actualEmissionBands) setActualEmissionBands(cached.actualEmissionBands);
+      if (cached.emissionFrequency) setEmissionFrequency(cached.emissionFrequency);
+      setScrubberTimeMs(cached.scrubberTimeMs || Number((totalDwells * DWELL_DURATION_MS).toFixed(1)));
+    } else {
+      const finalTime = Number((totalDwells * DWELL_DURATION_MS).toFixed(1));
+      setScrubberTimeMs(finalTime);
+      try {
+        const fromDwell = Math.max(1, totalDwells - 20);
+        const historyData = await fetchDwellHistory(fromDwell, totalDwells);
+        if (historyData && historyData.dwells && historyData.dwells.length > 0) {
+          const finalObs = historyData.dwells.map(dwellToObservation).filter(Boolean);
+          setObservations(finalObs);
+          const lastDwell = historyData.dwells[historyData.dwells.length - 1];
+          if (lastDwell) {
+            if (lastDwell.adaptive) {
+              setMlCurrentBand(lastDwell.adaptive.currentBand);
+              setMlInterceptedFreq(lastDwell.adaptive.interceptedFrequency);
+              if (lastDwell.adaptive.metrics) setMlMetrics(lastDwell.adaptive.metrics);
+            }
+            if (lastDwell.openLoop) {
+              setOpenLoopCurrentBand(lastDwell.openLoop.currentBand);
+              setOpenLoopInterceptedFreq(lastDwell.openLoop.interceptedFrequency);
+              if (lastDwell.openLoop.metrics) setOpenLoopMetrics(lastDwell.openLoop.metrics);
+            }
+            if (lastDwell.environment) {
+              setActualEmissionBand(lastDwell.environment.actualEmissionBand);
+              setActualEmissionBands(lastDwell.environment.actualEmissionBands || []);
+              setEmissionFrequency(lastDwell.environment.emissionFrequency);
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('Could not restore final dwell history on switch to live:', err);
       }
     }
 
-    if (targetDwell >= TOTAL_SIMULATION_DWELLS) {
+    showToast('Switched to completed live mode view.');
+  };
+
+  // Dragging or clicking timeline jumps exactly to that timestamp and starts playing from there
+  const handleScrubberChange = async (timeVal) => {
+    const val = parseFloat(timeVal);
+    setScrubberTimeMs(val);
+    const targetDwell = Math.max(1, Math.min(totalDwells, Math.round(val / DWELL_DURATION_MS)));
+
+    try {
+      const fromDwell = Math.max(1, targetDwell - 60);
+      const historyData = await fetchDwellHistory(fromDwell, targetDwell);
+      if (historyData && historyData.dwells) {
+        const historicalObservations = historyData.dwells.map(dwellToObservation).filter(Boolean);
+        setObservations(historicalObservations);
+
+        const dwell = historyData.dwells[historyData.dwells.length - 1];
+        if (dwell) {
+          if (dwell.adaptive) {
+            setMlCurrentBand(dwell.adaptive.currentBand);
+            setMlInterceptedFreq(dwell.adaptive.interceptedFrequency);
+            if (dwell.adaptive.metrics) setMlMetrics(dwell.adaptive.metrics);
+          }
+          if (dwell.openLoop) {
+            setOpenLoopCurrentBand(dwell.openLoop.currentBand);
+            setOpenLoopInterceptedFreq(dwell.openLoop.interceptedFrequency);
+            if (dwell.openLoop.metrics) setOpenLoopMetrics(dwell.openLoop.metrics);
+          }
+          if (dwell.environment) {
+            setActualEmissionBand(dwell.environment.actualEmissionBand);
+            setActualEmissionBands(
+              dwell.environment.actualEmissionBands ||
+                (dwell.environment.actualEmissionBand ? [dwell.environment.actualEmissionBand] : [])
+            );
+            setEmissionFrequency(dwell.environment.emissionFrequency);
+          }
+        }
+      }
+    } catch (err) {
+      console.error('Failed to fetch historical dwells on scrub:', err);
+    }
+
+    sendTelemetryCommand({ command: 'scrub', dwell_index: targetDwell });
+
+    if (targetDwell >= totalDwells) {
       setIsSimulationComplete(true);
       setIsScanning(false);
     } else {
       setIsSimulationComplete(false);
     }
 
-    // Set stream start index so live stream plays forward from this point
     setStreamStartIndex(targetDwell);
   };
 
-  const handleClearSimulation = () => {
+  // Called when user scrolls backwards in graph or table to dynamically expand the local observation cache from backend
+  const handleLoadEarlierDwells = async (count = 20) => {
+    const currentObs = observationsRef.current && observationsRef.current.length > 0
+      ? observationsRef.current
+      : observations;
+    if (!currentObs || currentObs.length === 0) return { addedCount: 0, observations: currentObs };
+    const earliestDwellIndex = currentObs[0]?.dwellIndex || 1;
+    if (earliestDwellIndex <= 1) return { addedCount: 0, observations: currentObs }; // Already reached the very start
+
+    const fromDwell = Math.max(1, earliestDwellIndex - count);
+    const toDwell = earliestDwellIndex - 1;
+    try {
+      const historyData = await fetchDwellHistory(fromDwell, toDwell);
+      if (historyData && historyData.dwells && historyData.dwells.length > 0) {
+        const earlierObs = historyData.dwells.map(dwellToObservation).filter(Boolean);
+        const updated = [...earlierObs, ...currentObs];
+        observationsRef.current = updated;
+        setObservations(updated);
+        return { addedCount: earlierObs.length, observations: updated };
+      }
+    } catch (err) {
+      console.error('Failed to load earlier dwells:', err);
+    }
+    return { addedCount: 0, observations: currentObs };
+  };
+
+  const handleClearSimulation = async () => {
+    try {
+      await resetSimulation();
+    } catch (e) {
+      console.warn('Reset error:', e);
+    }
+    sendTelemetryCommand({ command: 'reset' });
     setLoadedDataset(null);
     setIsScanning(false);
     setIsSimulationComplete(false);
     setIsSlowReplay(false);
+    completedLiveStateRef.current = null;
+    hasLiveCompletedRef.current = false;
     setStreamStartIndex(0);
     setScrubberTimeMs(0.5);
     setObservations([]);
+    setRealTimeSeconds(0);
     setMlCurrentBand(null);
     setOpenLoopCurrentBand(null);
     setActualEmissionBand(null);
@@ -399,6 +609,32 @@ export default function App() {
                     20 Channels (875 MHz)
                   </span>
                 </div>
+
+                {/* Live Real Time Stopwatch Pill (hidden in Slow Replay Mode) */}
+                {!isSlowReplay && (
+                  <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-slate-50 border border-slate-200/90 text-slate-600 select-none shadow-2xs">
+                    <span className={`material-symbols-outlined text-[12px] text-primary ${isScanning ? 'animate-pulse' : ''}`}>
+                      timer
+                    </span>
+                    <span className="font-label-sm text-[9.5px] uppercase text-slate-500 font-semibold tracking-wide">
+                      Real Time:
+                    </span>
+                    <span className="font-mono text-[10.5px] font-bold text-slate-800">
+                      {realTimeSeconds.toFixed(1)}s
+                    </span>
+                  </div>
+                )}
+
+                {/* RF Simulation Time Window Pill */}
+                <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-slate-50 border border-slate-200/90 text-slate-600 select-none shadow-2xs">
+                  <span className="material-symbols-outlined text-[12px] text-primary">schedule</span>
+                  <span className="font-label-sm text-[9.5px] uppercase text-slate-500 font-semibold tracking-wide">
+                    RF Sim:
+                  </span>
+                  <span className="font-mono text-[10px] font-bold text-slate-800">
+                    {scrubberTimeMs.toFixed(1)} ms
+                  </span>
+                </div>
               </div>
 
               {/* Action Buttons: Play/Pause/Replay, Slow Replay, Remove (Micro compact size) */}
@@ -425,18 +661,7 @@ export default function App() {
                       </button>
                     ) : (
                       <>
-                        {/* Simulation Completed: Replay button */}
-                        <button
-                          onClick={handleReplaySimulation}
-                          type="button"
-                          className="flex items-center gap-1 px-1.5 py-0.5 rounded-md font-label-md text-[9.5px] font-medium bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 transition-colors select-none cursor-pointer shadow-2xs"
-                          title="Replay from 0.0 ms"
-                        >
-                          <span className="material-symbols-outlined text-[12px]">replay</span>
-                          <span>Replay</span>
-                        </button>
-
-                        {/* Slow Replay button: Visible ONLY after actual mode has completed */}
+                        {/* Slow Replay button: Visible after live simulation mode has completed */}
                         <button
                           onClick={handleSwitchToSlowReplay}
                           type="button"
@@ -495,15 +720,16 @@ export default function App() {
                   </>
                 )}
 
-                {/* Remove Simulation Button */}
+                {/* Remove Dataset Button */}
                 <button
                   onClick={handleClearSimulation}
                   type="button"
                   className="flex items-center gap-1 px-1.5 py-0.5 rounded-md font-label-md text-[9.5px] font-medium text-slate-600 hover:text-rose-700 bg-slate-50 hover:bg-rose-50 border border-slate-200 hover:border-rose-200 transition-colors cursor-pointer select-none shadow-2xs"
-                  title="Remove simulation, unload dataset, and return to default state"
+                  title="Remove dataset and return to default state"
+                  id="btn-remove-dataset"
                 >
                   <span className="material-symbols-outlined text-[12px]">delete_outline</span>
-                  <span>Remove Simulation</span>
+                  <span>Remove Dataset</span>
                 </button>
               </div>
             </div>
@@ -517,14 +743,14 @@ export default function App() {
                     <span>Simulation Timeline</span>
                   </div>
                   <span className="font-mono text-[11.5px] font-bold text-primary bg-primary/10 px-2.5 py-0.5 rounded-md border border-primary/20">
-                    {scrubberTimeMs.toFixed(1)} ms / {(TOTAL_SIMULATION_DWELLS * DWELL_DURATION_MS).toFixed(1)} ms
+                    {scrubberTimeMs.toFixed(1)} ms / {(totalDwells * DWELL_DURATION_MS).toFixed(1)} ms
                   </span>
                 </div>
                 <div className="relative w-full flex items-center">
                   <input
                     type="range"
                     min="0.5"
-                    max={(TOTAL_SIMULATION_DWELLS * DWELL_DURATION_MS).toFixed(1)}
+                    max={(totalDwells * DWELL_DURATION_MS).toFixed(1)}
                     step="0.5"
                     value={scrubberTimeMs}
                     onChange={(e) => handleScrubberChange(e.target.value)}
@@ -579,15 +805,21 @@ export default function App() {
           {loadedDataset && (
             <ObservationsSection
               observations={observations}
+              totalDwells={totalDwells}
               isScanning={isScanning}
+              isCompleted={isSimulationComplete}
+              isSlowReplay={isSlowReplay}
               hasDataset={!!loadedDataset}
               viewMode={viewMode}
               onExportNotify={showToast}
+              onLoadEarlier={handleLoadEarlierDwells}
             />
           )}
           <RLParametersAccordion
-            avgReward={mlMetrics.avgReward || '+0.74'}
+            mlMetrics={mlMetrics}
+            openLoopMetrics={openLoopMetrics}
             hasDataset={!!loadedDataset}
+            config={rlConfig}
           />
         </div>
       </main>

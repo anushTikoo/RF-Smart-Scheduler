@@ -1,4 +1,5 @@
-import React, { useState, useRef, useEffect, useCallback, useLayoutEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo, useLayoutEffect } from 'react';
+import { downloadFullCsv } from '../services/telemetryService';
 
 // Discrete Stepped Band vs. Time Graph Icon with orthogonal horizontal dwell lines & vertical transitions
 function BandStepGraphIcon({ className = "w-[20px] h-[20px] text-primary" }) {
@@ -32,28 +33,40 @@ function BandStepGraphIcon({ className = "w-[20px] h-[20px] text-primary" }) {
 
 export default function ObservationsSection({
   observations = [],
+  totalDwells = 0,
   isScanning = false,
+  isCompleted = false,
+  isSlowReplay = false,
   hasDataset = false,
   viewMode = 'receiver', // 'receiver' | 'environment'
   onExportNotify,
+  onLoadEarlier,
 }) {
+  const isInteractive = isCompleted || isSlowReplay;
+
   const [displayMode, setDisplayMode] = useState('graph'); // 'graph' | 'table'
-  const [filter, setFilter] = useState('all'); // 'all' | 'interceptions' | 'misses' | 'emissions'
+  const [tableShowInterceptedOnly, setTableShowInterceptedOnly] = useState(false);
   const [isViewDropdownOpen, setIsViewDropdownOpen] = useState(false);
-  const [isFilterDropdownOpen, setIsFilterDropdownOpen] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
 
   const CHUNK_SIZE = 20;
   const SLOT_WIDTH = 44;
+  const PADDING_LEFT = 20;
 
   // Graph state: graphRevealedCount starts at CHUNK_SIZE (shows latest 20 dwells).
-  // Scrolling/dragging backwards prepends earlier dwells by increasing graphRevealedCount in fixed CHUNK_SIZE increments.
   const [graphRevealedCount, setGraphRevealedCount] = useState(CHUNK_SIZE);
   const [isLoadingEarlierGraph, setIsLoadingEarlierGraph] = useState(false);
+  const [isJumpingToHit, setIsJumpingToHit] = useState(false);
+  const [highlightedHitDwellId, setHighlightedHitDwellId] = useState(null);
+  const highlightTimeoutRef = useRef(null);
+  const pendingScrollToDwellIndexRef = useRef(null);
+  const lastJumpedHitIdRef = useRef(null);
 
   // Table state: tableVisibleCount starts at CHUNK_SIZE (20).
-  // Scrolling downwards to the bottom appends earlier decisions in fixed CHUNK_SIZE increments.
   const [tableVisibleCount, setTableVisibleCount] = useState(CHUNK_SIZE);
   const [isLoadingEarlierTable, setIsLoadingEarlierTable] = useState(false);
+  const [userScrolledBack, setUserScrolledBack] = useState(false);
+  const [tableScrolledDown, setTableScrolledDown] = useState(false);
 
   const sliderRef = useRef(null);
   const isDownRef = useRef(false);
@@ -61,6 +74,17 @@ export default function ObservationsSection({
   const scrollLeftRef = useRef(0);
   const userScrolledBackRef = useRef(false);
   const prevObsLengthRef = useRef(0);
+  const observationsRef = useRef(observations);
+
+  useEffect(() => {
+    observationsRef.current = observations;
+  }, [observations]);
+
+  useEffect(() => {
+    return () => {
+      if (highlightTimeoutRef.current) clearTimeout(highlightTimeoutRef.current);
+    };
+  }, []);
 
   // Robust loading lock & re-arm flags to guarantee fixed-chunk increments
   const isLoadingGraphRef = useRef(false);
@@ -73,8 +97,18 @@ export default function ObservationsSection({
 
   const [hoverInfo, setHoverInfo] = useState(null);
 
-  // Graph dwells: latest graphRevealedCount dwells
+  // Graph dwells: always continuous latest graphRevealedCount dwells from full timeline
   const graphDwells = observations.slice(-Math.max(CHUNK_SIZE, graphRevealedCount));
+
+  // Table source: either all dwells or strictly intercepted dwells
+  const tableSource = useMemo(() => {
+    return tableShowInterceptedOnly
+      ? observations.filter((obs) => Boolean(obs.isIntercepted))
+      : observations;
+  }, [observations, tableShowInterceptedOnly]);
+
+  const displayedTableDwells = tableSource.slice(-tableVisibleCount);
+  const filteredTableRows = [...displayedTableDwells].reverse();
 
   // Auto-scroll graph to leading edge ONLY if user has NOT scrolled back
   useEffect(() => {
@@ -88,13 +122,26 @@ export default function ObservationsSection({
     prevObsLengthRef.current = len;
   }, [observations.length, isScanning]);
 
-  // Seamless scrollLeft offset compensation when earlier dwells are prepended to the graph
+  // Seamless scrollLeft offset compensation or smooth centering on jump
   useLayoutEffect(() => {
     if (!sliderRef.current) return;
     const currentLen = graphDwells.length;
     const added = currentLen - prevGraphDwellsLenRef.current;
 
-    if (added > 0 && isPrependingGraphRef.current) {
+    // Check if there is a pending jump to a hit dwell
+    if (pendingScrollToDwellIndexRef.current != null) {
+      const targetIdx = graphDwells.findIndex(
+        (d) => (d.dwellIndex || d.id) === pendingScrollToDwellIndexRef.current
+      );
+      if (targetIdx !== -1) {
+        const midX = PADDING_LEFT + targetIdx * SLOT_WIDTH + SLOT_WIDTH / 2;
+        const targetScrollLeft = Math.max(0, midX - sliderRef.current.clientWidth / 2);
+        sliderRef.current.scrollTo({ left: targetScrollLeft, behavior: 'smooth' });
+        scrollLeftRef.current = targetScrollLeft;
+        userScrolledBackRef.current = true;
+        pendingScrollToDwellIndexRef.current = null;
+      }
+    } else if (added > 0 && isPrependingGraphRef.current) {
       const addedPx = added * SLOT_WIDTH;
       sliderRef.current.scrollLeft += addedPx;
       scrollLeftRef.current += addedPx;
@@ -102,7 +149,7 @@ export default function ObservationsSection({
     }
 
     prevGraphDwellsLenRef.current = currentLen;
-  }, [graphDwells.length]);
+  }, [graphDwells.length, graphDwells]);
 
   // When a new dataset or replay is loaded, reset revealed counts
   useEffect(() => {
@@ -114,49 +161,224 @@ export default function ObservationsSection({
       canLoadTableRef.current = true;
       isLoadingGraphRef.current = false;
       isLoadingTableRef.current = false;
+      setIsJumpingToHit(false);
+      setHighlightedHitDwellId(null);
+      pendingScrollToDwellIndexRef.current = null;
+      lastJumpedHitIdRef.current = null;
+      setUserScrolledBack(false);
+      setTableScrolledDown(false);
       prevGraphDwellsLenRef.current = 0;
     }
   }, [observations.length]);
 
-  // Fallback to 'all' if user switched to receiver view while 'emissions' was selected
-  const effectiveFilter = (viewMode === 'receiver' && filter === 'emissions') ? 'all' : filter;
+  // Helper to ensure enough matching entries exist in table cache when tableShowInterceptedOnly is true
+  const ensureTableEntries = useCallback(async (targetCount) => {
+    if (!onLoadEarlier) return;
+    if (!tableShowInterceptedOnly) {
+      if (observations.length < targetCount) {
+        await onLoadEarlier(CHUNK_SIZE);
+      }
+      return;
+    }
+    let attempts = 0;
+    while (attempts < 6) {
+      const currentHits = observations.filter((o) => Boolean(o.isIntercepted));
+      if (currentHits.length >= targetCount) break;
+      const earliestIdx = observations[0]?.dwellIndex || 1;
+      if (earliestIdx <= 1) break;
+      const needed = Math.max(CHUNK_SIZE, (targetCount - currentHits.length) * 3);
+      const res = await onLoadEarlier(needed);
+      const added = typeof res === 'number' ? res : (res?.addedCount || 0);
+      if (res && res.observations) {
+        observationsRef.current = res.observations;
+      }
+      if (!added || added === 0) break;
+      attempts++;
+    }
+  }, [observations, tableShowInterceptedOnly, onLoadEarlier]);
 
-  // Filter options based on viewMode
-  const filterOptions = viewMode === 'environment'
-    ? [
-        { id: 'all', label: 'All Dwells', desc: 'Hits, Scan Misses & Emissions' },
-        { id: 'interceptions', label: 'Hits Only', desc: 'Detected hits only' },
-        { id: 'misses', label: 'Scan Misses Only', desc: 'Missed opportunities' },
-        { id: 'emissions', label: 'Actual Emissions Only', desc: 'Target emissions only' },
-      ]
-    : [
-        { id: 'all', label: 'All Dwells', desc: 'Full receiver scan timeline' },
-        { id: 'interceptions', label: 'Hits Only', desc: 'Detected hits only' },
-        { id: 'misses', label: 'Scan Misses Only', desc: 'Missed opportunities' },
-      ];
+  // Automatically load earlier entries into table if empty or below CHUNK_SIZE
+  useEffect(() => {
+    if (displayMode !== 'table' || !isInteractive || isLoadingTableRef.current) return;
+    const earliestIdx = observations[0]?.dwellIndex || 1;
+    if (earliestIdx <= 1) return;
 
-  const currentFilterMeta = filterOptions.find((f) => f.id === effectiveFilter) || filterOptions[0];
+    if (displayedTableDwells.length < CHUNK_SIZE) {
+      isLoadingTableRef.current = true;
+      setIsLoadingEarlierTable(true);
+      ensureTableEntries(CHUNK_SIZE)
+        .then(() => {
+          setTableVisibleCount((prev) => Math.max(prev, CHUNK_SIZE));
+        })
+        .catch((err) => console.error('Auto-load table error:', err))
+        .finally(() => {
+          setIsLoadingEarlierTable(false);
+          isLoadingTableRef.current = false;
+        });
+    }
+  }, [displayMode, isInteractive, tableShowInterceptedOnly, displayedTableDwells.length, observations.length, ensureTableEntries]);
 
   // Trigger loading earlier dwells into the graph (prepending fixed chunk of 20 dwells)
-  const triggerLoadEarlierGraph = useCallback(() => {
-    if (isLoadingGraphRef.current || !canLoadEarlierGraphRef.current) return;
-    if (graphRevealedCount >= observations.length) return;
+  const triggerLoadEarlierGraph = useCallback(async () => {
+    if (!isInteractive || isLoadingGraphRef.current || !canLoadEarlierGraphRef.current) return;
 
     isLoadingGraphRef.current = true;
     canLoadEarlierGraphRef.current = false;
     setIsLoadingEarlierGraph(true);
 
-    setTimeout(() => {
+    try {
+      if (graphRevealedCount >= observations.length && onLoadEarlier) {
+        const res = await onLoadEarlier(CHUNK_SIZE);
+        if (res && res.observations) {
+          observationsRef.current = res.observations;
+        }
+      }
       isPrependingGraphRef.current = true;
-      setGraphRevealedCount((prev) => Math.min(observations.length, prev + CHUNK_SIZE));
+      setGraphRevealedCount((prev) => prev + CHUNK_SIZE);
+    } catch (err) {
+      console.error('Failed to load earlier graph dwells:', err);
+    } finally {
       setIsLoadingEarlierGraph(false);
       isLoadingGraphRef.current = false;
-    }, 280);
-  }, [graphRevealedCount, observations.length]);
+    }
+  }, [isInteractive, graphRevealedCount, observations.length, onLoadEarlier]);
+
+  // Jump to Previous Interception in Graph: Steps backward through RF hits, loading earlier chunks as needed
+  const handleJumpToPreviousInterception = useCallback(async () => {
+    if (!isInteractive || isJumpingToHit) return;
+    setIsJumpingToHit(true);
+
+    try {
+      let currentObs = observationsRef.current && observationsRef.current.length > 0
+        ? observationsRef.current
+        : observations;
+
+      if (!currentObs || currentObs.length === 0) {
+        if (onExportNotify) onExportNotify("No observations recorded yet.");
+        return;
+      }
+
+      let hitObs = currentObs.filter((o) => Boolean(o.isIntercepted));
+      const currentHitId = lastJumpedHitIdRef.current;
+      let targetHit = null;
+
+      if (currentHitId == null) {
+        // First jump: find the latest hit — keep loading earlier chunks until a hit is found or data runs out
+        let attempts = 0;
+        while (hitObs.length === 0 && onLoadEarlier && attempts < 50) {
+          const earliestIdx = currentObs[0]?.dwellIndex || 1;
+          if (earliestIdx <= 1) break;
+
+          const res = await onLoadEarlier(CHUNK_SIZE);
+          const added = typeof res === 'number' ? res : (res?.addedCount || 0);
+          if (res && res.observations) {
+            observationsRef.current = res.observations;
+            currentObs = res.observations;
+          } else {
+            currentObs = observationsRef.current && observationsRef.current.length > 0
+              ? observationsRef.current
+              : observations;
+          }
+          if (!added || added === 0) break;
+          hitObs = currentObs.filter((o) => Boolean(o.isIntercepted));
+          attempts++;
+        }
+
+        if (hitObs.length === 0) {
+          if (onExportNotify) onExportNotify("No RF interceptions found in the dataset.");
+          return;
+        }
+
+        targetHit = hitObs[hitObs.length - 1];
+      } else {
+        // Step backward: find earlier hit before currentHitId — keep loading until one is found or data runs out
+        let earlierHits = hitObs.filter((h) => (h.dwellIndex || h.id) < currentHitId);
+
+        let attempts = 0;
+        while (earlierHits.length === 0 && onLoadEarlier && attempts < 50) {
+          const earliestIdx = currentObs[0]?.dwellIndex || 1;
+          if (earliestIdx <= 1) break;
+
+          const res = await onLoadEarlier(CHUNK_SIZE);
+          const added = typeof res === 'number' ? res : (res?.addedCount || 0);
+          if (res && res.observations) {
+            observationsRef.current = res.observations;
+            currentObs = res.observations;
+          } else {
+            currentObs = observationsRef.current && observationsRef.current.length > 0
+              ? observationsRef.current
+              : observations;
+          }
+          if (!added || added === 0) break;
+          hitObs = currentObs.filter((o) => Boolean(o.isIntercepted));
+          earlierHits = hitObs.filter((h) => (h.dwellIndex || h.id) < currentHitId);
+          attempts++;
+        }
+
+        if (earlierHits.length > 0) {
+          targetHit = earlierHits[earlierHits.length - 1];
+        } else {
+          if (onExportNotify) {
+            onExportNotify("Reached earliest recorded hit in simulation.");
+          }
+          targetHit = hitObs.find((h) => (h.dwellIndex || h.id) === currentHitId) || hitObs[0];
+        }
+      }
+
+      if (!targetHit) return;
+
+      const targetHitId = targetHit.dwellIndex || targetHit.id;
+      lastJumpedHitIdRef.current = targetHitId;
+
+      const targetIdxInObs = currentObs.findIndex(
+        (o) => (o.dwellIndex || o.id) === targetHitId
+      );
+
+      if (targetIdxInObs === -1) return;
+
+      const distFromEnd = currentObs.length - targetIdxInObs;
+
+      if (graphRevealedCount < distFromEnd + 5) {
+        const neededCount = Math.max(
+          CHUNK_SIZE,
+          Math.ceil((distFromEnd + 10) / CHUNK_SIZE) * CHUNK_SIZE
+        );
+        isPrependingGraphRef.current = false;
+        setGraphRevealedCount(neededCount);
+      }
+
+      userScrolledBackRef.current = true;
+      setUserScrolledBack(true);
+      pendingScrollToDwellIndexRef.current = targetHitId;
+
+      setHighlightedHitDwellId(targetHitId);
+      if (highlightTimeoutRef.current) clearTimeout(highlightTimeoutRef.current);
+      highlightTimeoutRef.current = setTimeout(() => {
+        setHighlightedHitDwellId(null);
+      }, 3500);
+
+      const currentGraphDwells = currentObs.slice(-Math.max(CHUNK_SIZE, graphRevealedCount));
+      const targetGraphIdx = currentGraphDwells.findIndex(
+        (d) => (d.dwellIndex || d.id) === targetHitId
+      );
+
+      if (targetGraphIdx !== -1 && sliderRef.current) {
+        const midX = PADDING_LEFT + targetGraphIdx * SLOT_WIDTH + SLOT_WIDTH / 2;
+        const targetScrollLeft = Math.max(0, midX - sliderRef.current.clientWidth / 2);
+        sliderRef.current.scrollTo({ left: targetScrollLeft, behavior: 'smooth' });
+        scrollLeftRef.current = targetScrollLeft;
+        pendingScrollToDwellIndexRef.current = null;
+      }
+    } catch (err) {
+      console.error('Failed to jump to previous interception:', err);
+    } finally {
+      setIsJumpingToHit(false);
+    }
+  }, [isInteractive, isJumpingToHit, observations, onLoadEarlier, graphRevealedCount, onExportNotify]);
 
   // Graph wheel handler (supports natural wheel panning & backward fetch)
   const handleGraphWheel = (e) => {
-    if (!sliderRef.current) return;
+    if (!isInteractive || !sliderRef.current) return;
     const delta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
     sliderRef.current.scrollLeft += delta;
 
@@ -172,11 +394,15 @@ export default function ObservationsSection({
     // Check if user has scrolled away from the right edge
     const isAtRightEdge = sliderRef.current.scrollLeft >= sliderRef.current.scrollWidth - sliderRef.current.clientWidth - 20;
     userScrolledBackRef.current = !isAtRightEdge;
+    setUserScrolledBack(!isAtRightEdge || graphRevealedCount > CHUNK_SIZE);
+    if (isAtRightEdge && graphRevealedCount <= CHUNK_SIZE) {
+      lastJumpedHitIdRef.current = null;
+    }
   };
 
-  // Mouse pan handlers for the graph (works smoothly during slow replay, fast scan, or completed)
+  // Mouse pan handlers for the graph (only active when isInteractive)
   const handleMouseDown = (e) => {
-    if (!sliderRef.current) return;
+    if (!isInteractive || !sliderRef.current) return;
     isDownRef.current = true;
     setHoverInfo(null);
     startXRef.current = e.pageX;
@@ -188,81 +414,132 @@ export default function ObservationsSection({
   };
 
   const handleMouseMove = (e) => {
-    if (isDownRef.current && sliderRef.current) {
-      e.preventDefault();
-      const dx = e.pageX - startXRef.current;
-      sliderRef.current.scrollLeft = scrollLeftRef.current - dx;
+    if (!isInteractive || !isDownRef.current || !sliderRef.current) return;
+    e.preventDefault();
+    const dx = e.pageX - startXRef.current;
+    sliderRef.current.scrollLeft = scrollLeftRef.current - dx;
 
-      if (sliderRef.current.scrollLeft > 35) {
-        canLoadEarlierGraphRef.current = true;
-      }
+    if (sliderRef.current.scrollLeft > 35) {
+      canLoadEarlierGraphRef.current = true;
+    }
 
-      // If user drags towards right (dx > 30, meaning pulling earlier history) while at or near the left edge
-      if (sliderRef.current.scrollLeft <= 5 && dx > 30) {
-        triggerLoadEarlierGraph();
-      }
+    // If user drags towards right (dx > 30, meaning pulling earlier history) while at or near the left edge
+    if (sliderRef.current.scrollLeft <= 5 && dx > 30) {
+      triggerLoadEarlierGraph();
+    }
 
-      const isAtRightEdge = sliderRef.current.scrollLeft >= sliderRef.current.scrollWidth - sliderRef.current.clientWidth - 20;
-      userScrolledBackRef.current = !isAtRightEdge;
+    const isAtRightEdge = sliderRef.current.scrollLeft >= sliderRef.current.scrollWidth - sliderRef.current.clientWidth - 20;
+    userScrolledBackRef.current = !isAtRightEdge;
+    setUserScrolledBack(!isAtRightEdge || graphRevealedCount > CHUNK_SIZE);
+    if (isAtRightEdge && graphRevealedCount <= CHUNK_SIZE) {
+      lastJumpedHitIdRef.current = null;
+    }
+  };
+
+  // Jump back to latest scan timeline (last 20 dwells)
+  const handleJumpToLatest = () => {
+    lastJumpedHitIdRef.current = null;
+    userScrolledBackRef.current = false;
+    setUserScrolledBack(false);
+    setGraphRevealedCount(CHUNK_SIZE);
+    if (sliderRef.current) {
+      sliderRef.current.scrollTo({
+        left: sliderRef.current.scrollWidth,
+        behavior: 'smooth',
+      });
+      scrollLeftRef.current = sliderRef.current.scrollWidth;
+    }
+  };
+
+  // Jump back to top of table (latest 20 entries)
+  const handleJumpToLatestTable = () => {
+    setTableVisibleCount(CHUNK_SIZE);
+    setTableScrolledDown(false);
+    const tableEl = document.getElementById('observation-table-scroll-area');
+    if (tableEl) {
+      tableEl.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
 
   // Table scroll handler: infinite scroll downwards to load older decisions in fixed CHUNK_SIZE (20) increments
-  const handleTableScroll = (e) => {
+  const handleTableScroll = async (e) => {
+    if (!isInteractive) return;
     const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
     const distanceFromBottom = scrollHeight - (scrollTop + clientHeight);
+
+    setTableScrolledDown(scrollTop > 40 || tableVisibleCount > CHUNK_SIZE);
 
     if (distanceFromBottom > 50) {
       canLoadTableRef.current = true;
     }
 
-    if (distanceFromBottom <= 15 && canLoadTableRef.current && !isLoadingTableRef.current) {
-      if (tableVisibleCount < observations.length) {
-        isLoadingTableRef.current = true;
-        canLoadTableRef.current = false;
-        setIsLoadingEarlierTable(true);
-
-        setTimeout(() => {
-          setTableVisibleCount((prev) => Math.min(observations.length, prev + CHUNK_SIZE));
-          setIsLoadingEarlierTable(false);
-          isLoadingTableRef.current = false;
-        }, 280);
+    if (distanceFromBottom <= 35 && canLoadTableRef.current && !isLoadingTableRef.current) {
+      isLoadingTableRef.current = true;
+      canLoadTableRef.current = false;
+      setIsLoadingEarlierTable(true);
+      try {
+        await ensureTableEntries(tableVisibleCount + CHUNK_SIZE);
+        setTableVisibleCount((prev) => prev + CHUNK_SIZE);
+      } catch (err) {
+        console.error('Failed to load earlier table dwells:', err);
+      } finally {
+        setIsLoadingEarlierTable(false);
+        isLoadingTableRef.current = false;
       }
     }
   };
 
-  // Table rows: newest at top, older entries down below
-  const displayedTableDwells = observations.slice(-tableVisibleCount);
-  const filteredTableRows = [...displayedTableDwells].reverse().filter((obs) => {
-    if (effectiveFilter === 'interceptions') return obs.isIntercepted;
-    if (effectiveFilter === 'misses') return !obs.isIntercepted;
-    return true;
-  });
+  // CSV download function: calls backend to stream complete dataset (only available after simulation is done)
+  const handleExportCSV = async () => {
+    if (!isCompleted || isExporting) return;
+    setIsExporting(true);
 
-  // CSV download function
-  const handleExportCSV = () => {
-    const allFiltered = observations.filter((obs) => {
-      if (effectiveFilter === 'interceptions') return obs.isIntercepted;
-      if (effectiveFilter === 'misses') return !obs.isIntercepted;
-      return true;
-    });
+    const exportFilter = (displayMode === 'table' && tableShowInterceptedOnly) ? 'interceptions' : 'all';
+
+    try {
+      await downloadFullCsv(viewMode, exportFilter);
+      if (onExportNotify) {
+        onExportNotify(
+          exportFilter === 'interceptions'
+            ? `Exported complete ${viewMode} interceptions dataset as CSV`
+            : `Exported complete ${viewMode} simulation dataset as CSV`
+        );
+      }
+    } catch (err) {
+      console.warn('Backend CSV download failed, falling back to local snapshot:', err);
+      exportLocalCSV();
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const exportLocalCSV = () => {
+    const isInterceptedOnly = displayMode === 'table' && tableShowInterceptedOnly;
+    const allFiltered = isInterceptedOnly
+      ? observations.filter((obs) => Boolean(obs.isIntercepted))
+      : observations;
 
     if (!allFiltered || allFiltered.length === 0) {
       if (onExportNotify) {
-        onExportNotify("No observations matching filter to export.");
+        onExportNotify("No observations to export.");
       }
       return;
     }
 
     const isEnv = viewMode === 'environment';
     const headers = isEnv
-      ? ["Time Window", "Selected Band", "Intercepted Frequency", "Result", "Pulses Detected", "Active Emissions in Window", "Frequency Range"]
-      : ["Time Window", "Selected Band", "Intercepted Frequency", "Result", "Pulses Detected", "Frequency Range"];
+      ? ["Time Window", "Selected Band", "Intercepted Frequency", "Result", "Reward", "Pulses Detected", "Active Emissions in Window", "Frequency Range"]
+      : ["Time Window", "Selected Band", "Intercepted Frequency", "Result", "Reward", "Pulses Detected", "Frequency Range"];
 
     const rows = allFiltered.map((obs) => {
-      const resultText = obs.result || (obs.isIntercepted ? 'HIT' : 'SCAN MISS');
+      const hasEm = Boolean(obs.hasEmission || (obs.actualEmissions && obs.actualEmissions.length > 0) || (obs.actualBands && obs.actualBands.length > 0));
+      const resultText = obs.isIntercepted
+        ? 'HIT'
+        : (isEnv ? (hasEm ? 'SCAN MISS' : 'QUIET MISS') : 'SCAN MISS');
       const pulses = obs.pulsesDetected !== undefined ? obs.pulsesDetected : (obs.isIntercepted ? 3 : 0);
       const exactIntercepted = obs.isIntercepted ? (obs.interceptedFreq && obs.interceptedFreq !== '-' ? obs.interceptedFreq : obs.centerFreq) : '-';
+      const dwellReward = obs.reward !== undefined ? Number(obs.reward) : (obs.isIntercepted ? 0.02 : -0.01);
+      const rewardStr = dwellReward > 0 ? `+${dwellReward.toFixed(2)}` : dwellReward.toFixed(2);
 
       const emissionStr = obs.actualEmissions && obs.actualEmissions.length > 0
         ? obs.actualEmissions.map((e) => `Band ${e.bandId} (${e.freqStr}) [${e.isDetected ? 'Detected' : 'Missed'}]`).join(' • ')
@@ -274,6 +551,7 @@ export default function ObservationsSection({
             `"${obs.band}"`,
             `"${exactIntercepted}"`,
             `"${resultText}"`,
+            `"${rewardStr}"`,
             `"${pulses}"`,
             `"${emissionStr}"`,
             `"${obs.range}"`,
@@ -283,6 +561,7 @@ export default function ObservationsSection({
             `"${obs.band}"`,
             `"${exactIntercepted}"`,
             `"${resultText}"`,
+            `"${rewardStr}"`,
             `"${pulses}"`,
             `"${obs.range}"`,
           ];
@@ -295,7 +574,7 @@ export default function ObservationsSection({
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `adaptive_ml_observations_${viewMode}_${effectiveFilter}_${Date.now()}.csv`);
+    link.setAttribute("download", `adaptive_ml_observations_${viewMode}_${isInterceptedOnly ? 'interceptions' : 'all'}_${Date.now()}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -351,7 +630,7 @@ export default function ObservationsSection({
 
   // Direct vertical lines connecting receiver band decisions between consecutive steps
   const verticalLines = [];
-  if (effectiveFilter === 'all' && pts.length > 1) {
+  if (pts.length > 1) {
     for (let i = 1; i < pts.length; i++) {
       const prev = pts[i - 1];
       const curr = pts[i];
@@ -369,15 +648,15 @@ export default function ObservationsSection({
   const latestPt = pts.length > 0 ? pts[pts.length - 1] : null;
   const cursorX = latestPt ? latestPt.endX : 0;
 
-  // Visibility of graph layers
-  const showInterceptions = effectiveFilter === 'all' || effectiveFilter === 'interceptions';
-  const showMisses = effectiveFilter === 'all' || effectiveFilter === 'misses';
-  const showActualEmissions = viewMode === 'environment' && (effectiveFilter === 'all' || effectiveFilter === 'emissions');
+  // Visibility of graph layers (graph displays true continuous scan timeline)
+  const showInterceptions = true;
+  const showMisses = true;
+  const showActualEmissions = viewMode === 'environment';
 
   return (
-    <div className="bg-white rounded-2xl shadow-[0_2px_10px_rgba(0,0,0,0.04)] border border-slate-200 p-5 sm:p-6 flex flex-col overflow-hidden">
+    <div className="bg-white rounded-2xl shadow-[0_2px_10px_rgba(0,0,0,0.04)] border border-slate-200 p-5 sm:p-6 flex flex-col">
       {/* Header bar */}
-      <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-slate-100">
+      <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-slate-100 relative z-30">
         <div className="flex flex-col gap-0.5">
           <div className="flex items-center gap-2">
             <BandStepGraphIcon className="w-[20px] h-[20px] text-primary" />
@@ -386,59 +665,33 @@ export default function ObservationsSection({
             </h3>
           </div>
           <p className="font-body-sm text-[11px] text-slate-500 font-normal pl-7">
-            Adaptive ML scan timeline • <span className="font-semibold text-slate-700 capitalize">{viewMode} View</span>
+            Adaptive ML scan timeline
           </p>
         </div>
 
         <div className="flex items-center gap-2.5 sm:gap-3 flex-wrap">
-          {/* Filter Dropdown Pill */}
-          <div className="relative inline-block">
+          {/* Jump to Previous Interception Button (Only in Graph View) */}
+          {displayMode === 'graph' && (
             <button
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white border border-slate-200 shadow-2xs text-slate-700 hover:text-slate-900 font-label-md text-[11.5px] font-semibold hover:border-primary/50 transition-all cursor-pointer"
               type="button"
-              onClick={() => {
-                setIsFilterDropdownOpen((prev) => !prev);
-                setIsViewDropdownOpen(false);
-              }}
+              onClick={handleJumpToPreviousInterception}
+              disabled={!isInteractive || isJumpingToHit || observations.length === 0}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white border border-slate-200 hover:border-emerald-400 hover:bg-emerald-50/60 text-slate-700 hover:text-emerald-900 font-label-md text-[11.5px] font-semibold transition-all cursor-pointer shadow-2xs disabled:opacity-40 disabled:cursor-not-allowed"
+              title={!isInteractive ? "Available after live simulation completes or in replay mode" : "Step backward to earlier RF interceptions in timeline"}
+              id="btn-jump-prev-hit"
             >
-              <span className="material-symbols-outlined text-[16px] text-primary">filter_list</span>
-              <span>Filter: <strong className="text-slate-900 font-bold">{currentFilterMeta.label}</strong></span>
-              <span className={`material-symbols-outlined text-[15px] text-slate-400 transition-transform duration-200 ${isFilterDropdownOpen ? 'rotate-180' : ''}`}>
-                expand_more
-              </span>
+              {isJumpingToHit ? (
+                <span className="material-symbols-outlined text-[15px] text-emerald-600 animate-spin">
+                  progress_activity
+                </span>
+              ) : (
+                <span className="material-symbols-outlined text-[15px] text-emerald-600">
+                  skip_previous
+                </span>
+              )}
+              <span>{isJumpingToHit ? 'Finding Hit...' : 'Previous Hit'}</span>
             </button>
-
-            {isFilterDropdownOpen && (
-              <div className="absolute right-0 top-full mt-1.5 w-52 bg-white border border-slate-200 rounded-xl shadow-[0_4px_16px_rgba(0,0,0,0.08)] p-1 z-50 animate-in fade-in slide-in-from-top-1 duration-150">
-                <div className="px-2.5 py-1 text-[10px] uppercase font-bold text-slate-400 tracking-wider">
-                  Show in {viewMode} view
-                </div>
-                {filterOptions.map((opt) => (
-                  <button
-                    key={opt.id}
-                    className={`w-full flex flex-col px-2.5 py-1.5 rounded-lg text-left transition-colors cursor-pointer ${
-                      effectiveFilter === opt.id
-                        ? 'bg-slate-50 text-primary font-semibold'
-                        : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
-                    }`}
-                    onClick={() => {
-                      setFilter(opt.id);
-                      setIsFilterDropdownOpen(false);
-                    }}
-                    type="button"
-                  >
-                    <div className="flex items-center justify-between w-full">
-                      <span className="text-[11.5px] font-medium">{opt.label}</span>
-                      {effectiveFilter === opt.id && (
-                        <span className="material-symbols-outlined text-[14px] text-primary">check</span>
-                      )}
-                    </div>
-                    <span className="text-[10px] text-slate-400 font-normal">{opt.desc}</span>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
+          )}
 
           {/* View Switcher Pill Dropdown (Graph View vs Tabular View) */}
           <div className="relative inline-block">
@@ -448,7 +701,6 @@ export default function ObservationsSection({
               type="button"
               onClick={() => {
                 setIsViewDropdownOpen((prev) => !prev);
-                setIsFilterDropdownOpen(false);
               }}
             >
               <span className="material-symbols-outlined text-[16px] text-primary" id="graph-view-icon">
@@ -502,22 +754,55 @@ export default function ObservationsSection({
             )}
           </div>
 
-          {/* Export CSV Button */}
-          <button
-            className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-slate-50 text-slate-700 hover:text-slate-900 font-label-sm text-[11.5px] font-medium border border-slate-200 hover:bg-slate-100 transition-colors cursor-pointer shadow-2xs"
-            onClick={handleExportCSV}
-            type="button"
-            title="Export dynamic observations stream as CSV"
-          >
-            <span className="material-symbols-outlined text-[15px] text-primary">download</span>
-            <span>Export CSV</span>
-          </button>
+          {/* Export CSV Button with Loading State and Hover Tooltip */}
+          <div className="relative group">
+            <button
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-50 text-slate-700 hover:text-slate-900 font-label-sm text-[11.5px] font-medium border border-slate-200 hover:bg-slate-100 transition-colors cursor-pointer shadow-2xs disabled:opacity-40 disabled:cursor-not-allowed"
+              onClick={handleExportCSV}
+              type="button"
+              disabled={!isCompleted || isExporting}
+              title={!isCompleted ? "Export CSV is available after the simulation completes" : undefined}
+            >
+              {isExporting ? (
+                <span className="material-symbols-outlined text-[15px] text-primary animate-spin">
+                  progress_activity
+                </span>
+              ) : (
+                <span className="material-symbols-outlined text-[15px] text-primary">download</span>
+              )}
+              <span>{isExporting ? 'Exporting All...' : 'Export CSV'}</span>
+            </button>
+            {/* Hover Tooltip explaining full data download */}
+            <div className="absolute right-0 top-full mt-1.5 hidden group-hover:flex flex-col items-end z-50 pointer-events-none">
+              <div className="px-2.5 py-1 rounded-md bg-slate-900/95 text-white text-[10px] font-medium tracking-wide shadow-md whitespace-nowrap">
+                {!isCompleted
+                  ? 'Available after simulation completes'
+                  : displayMode === 'table' && tableShowInterceptedOnly
+                  ? 'Downloads all intercepted dwells (all hits) from backend'
+                  : 'Downloads complete dataset (all decisions) from backend'}
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
       {/* Graph Container Display */}
       {displayMode === 'graph' && (
         <div className="mt-4 flex flex-col w-full overflow-hidden relative" id="observation-graph-display">
+          {/* Go to Latest Entries Arrow Button (Rightmost end of graph) */}
+          {userScrolledBack && (
+            <button
+              type="button"
+              onClick={handleJumpToLatest}
+              className="absolute right-2.5 top-[115px] -translate-y-1/2 z-30 w-8 h-8 rounded-full bg-slate-900/90 hover:bg-slate-900 text-white shadow-xl border border-slate-700/80 flex items-center justify-center transition-all cursor-pointer hover:scale-110 active:scale-95 backdrop-blur-xs group"
+              title="Go to latest emissions"
+              id="btn-graph-jump-latest"
+            >
+              <span className="material-symbols-outlined text-[19px] text-white group-hover:translate-x-0.5 transition-transform">
+                arrow_forward
+              </span>
+            </button>
+          )}
           {/* Loading indicator at the start of the graph when scrolling backwards: ONLY icon, no text */}
           {isLoadingEarlierGraph && (
             <div className="absolute left-[74px] top-1/2 -translate-y-1/2 z-30 flex items-center justify-center w-8 h-8 rounded-full bg-slate-900/90 text-primary shadow-lg border border-slate-700/60 pointer-events-none select-none backdrop-blur-xs">
@@ -531,14 +816,6 @@ export default function ObservationsSection({
             {/* Synchronized Fixed Y-Axis SVG Ruler */}
             <div className="shrink-0 select-none bg-slate-50 border-r border-slate-200">
               <svg width="68" height={plotHeight} className="block">
-                <text
-                  x="60"
-                  y="13"
-                  textAnchor="end"
-                  className="text-[9px] font-sans font-bold fill-slate-600 uppercase tracking-wide"
-                >
-                  Band
-                </text>
                 {/* Y-Axis Grid Tick Values (Band 20 down to Band 1) */}
                 {[20, 16, 12, 8, 4, 1].map((b) => (
                   <g key={`y-tick-${b}`}>
@@ -557,11 +834,12 @@ export default function ObservationsSection({
               </svg>
             </div>
 
-            {/* Pannable & Scrollable Graph Viewport (Free drag & scroll during and after scan) */}
+            {/* Pannable & Scrollable Graph Viewport (Interactive only when completed or slow replay) */}
             <div
-              className="relative flex-1 h-[230px] bg-white overflow-x-auto cursor-grab active:cursor-grabbing select-none"
+              className={`relative flex-1 h-[230px] bg-white overflow-x-auto select-none ${isInteractive ? 'cursor-grab active:cursor-grabbing' : 'cursor-default'}`}
               id="graph-pan-container"
               ref={sliderRef}
+              title={!isInteractive ? "Live stream active • Panning & scrolling will unlock when simulation completes" : "Click and drag to pan through earlier observation history"}
               onMouseDown={handleMouseDown}
               onMouseLeave={handleMouseLeaveOrUp}
               onMouseUp={handleMouseLeaveOrUp}
@@ -625,18 +903,73 @@ export default function ObservationsSection({
                   />
                 ))}
 
-                {/* Receiver Dwell Segments: Green (#10B981) for Interceptions, Yellow (#F59E0B) for Misses */}
+                {/* Receiver Dwell Segments: Green for Hits, Orange for Scan Miss with Emission, Slate for Quiet Miss */}
                 {pts.map((pt, idx) => {
                   const isHit = pt.obs.isIntercepted;
+                  const hasEmissionThisDwell = Boolean(pt.obs.hasEmission || (pt.obs.actualEmissions && pt.obs.actualEmissions.length > 0) || (pt.obs.actualBands && pt.obs.actualBands.length > 0));
+                  const isEnvView = viewMode === 'environment';
 
                   if (isHit && !showInterceptions) return null;
                   if (!isHit && !showMisses) return null;
 
-                  const strokeColor = isHit ? '#10B981' : '#F59E0B';
+                  // Green for hit; in env view: amber = scan miss with emission, slate = quiet idle miss
+                  // In receiver view: all misses look the same (can't tell from receiver POV)
+                  const strokeColor = isHit ? '#10B981' : (isEnvView ? (hasEmissionThisDwell ? '#F59E0B' : '#94A3B8') : '#F59E0B');
                   const freqText = pt.obs.interceptedFreq && pt.obs.interceptedFreq !== '-' ? pt.obs.interceptedFreq : pt.obs.centerFreq;
+                  const isHighlighted = (pt.obs.dwellIndex || pt.obs.id) === highlightedHitDwellId;
 
                   return (
                     <g key={`dwell-group-${pt.obs.id || idx}`}>
+                      {/* Pulsing Beacon & Badge if this is the jumped-to hit */}
+                      {isHighlighted && (
+                        <g key={`hit-beacon-${pt.obs.id || idx}`} className="pointer-events-none">
+                          <line
+                            x1={pt.midX}
+                            y1="22"
+                            x2={pt.midX}
+                            y2="204"
+                            stroke="#10B981"
+                            strokeWidth="1.5"
+                            strokeDasharray="3 3"
+                            opacity="0.65"
+                          />
+                          <rect
+                            x={pt.startX - 4}
+                            y={pt.y - 8}
+                            width={slotWidth + 8}
+                            height="16"
+                            rx="8"
+                            fill="#10B981"
+                            fillOpacity="0.22"
+                            stroke="#10B981"
+                            strokeWidth="1.8"
+                            className="animate-pulse"
+                          />
+
+                          <g transform={`translate(${pt.midX}, ${Math.max(22, pt.y - 18)})`}>
+                            <rect
+                              x="-33"
+                              y="-13"
+                              width={66}
+                              height="15"
+                              rx="4"
+                              fill="#064E3B"
+                              stroke="#34D399"
+                              strokeWidth="1"
+                              className="drop-shadow-sm"
+                            />
+                            <text
+                              x="0"
+                              y="-2"
+                              textAnchor="middle"
+                              fill="#A7F3D0"
+                              className="text-[9px] font-sans font-bold uppercase tracking-wider select-none"
+                            >
+                              Previous Hit
+                            </text>
+                          </g>
+                        </g>
+                      )}
                       {isHit ? (
                         <g
                           style={{ cursor: 'pointer' }}
@@ -770,52 +1103,73 @@ export default function ObservationsSection({
                 )}
 
                 {/* Standard Cartesian X-Axis Time Ticks */}
-                {pts.length > 0 && (
-                  <g key="x-tick-start">
-                    <line x1={pts[0].startX} y1="205" x2={pts[0].startX} y2="210" stroke="#94A3B8" strokeWidth="1.2" />
-                    <text
-                      x={pts[0].startX}
-                      y="222"
-                      textAnchor="middle"
-                      className="text-[10px] font-mono fill-slate-500 font-semibold select-none"
-                    >
-                      {`${pts[0].obs.startMs.toFixed(1)} ms`}
-                    </text>
-                  </g>
-                )}
-                {pts.map((pt, idx) => {
-                  const timeMs = pt.obs.endMs;
-                  const isLast = idx === pts.length - 1;
+                {(() => {
                   const totalDwells = pts.length;
-
-                  // Dynamic Tick Labeling:
-                  // For normal window (<= 25 dwells, 0.5 ms dwell steps): labels every 1.0 ms or on last dwell.
-                  // When dragged backwards (> 25 dwells): labels at 5.0 ms intervals (e.g. 5, 10, 15, 20 ms).
-                  let showLabel = false;
-                  if (totalDwells <= 25) {
-                    showLabel = Math.round(timeMs * 10) % 10 === 0 || isLast;
+                  let tickIntervalMs = 1.0;
+                  if (totalDwells > 150) {
+                    tickIntervalMs = 10.0;
+                  } else if (totalDwells > 25) {
+                    tickIntervalMs = 5.0;
                   } else {
-                    showLabel = Math.round(timeMs * 10) % 50 === 0 || isLast;
+                    tickIntervalMs = 1.0;
                   }
 
-                  const labelStr = `${timeMs.toFixed(1)} ms`;
+                  let lastLabelX = -999;
+                  const MIN_LABEL_DISTANCE_PX = 80;
 
                   return (
-                    <g key={`x-tick-${pt.obs.id || idx}`}>
-                      <line x1={pt.endX} y1="205" x2={pt.endX} y2="210" stroke="#94A3B8" strokeWidth="1.2" />
-                      {showLabel && (
-                        <text
-                          x={pt.endX}
-                          y="222"
-                          textAnchor="middle"
-                          className="text-[10px] font-mono fill-slate-500 font-semibold select-none"
-                        >
-                          {labelStr}
-                        </text>
+                    <>
+                      {/* Starting axis tick mark */}
+                      {pts.length > 0 && (
+                        <line
+                          x1={pts[0].startX}
+                          y1="205"
+                          x2={pts[0].startX}
+                          y2="210"
+                          stroke="#94A3B8"
+                          strokeWidth="1.2"
+                        />
                       )}
-                    </g>
+                      {pts.map((pt, idx) => {
+                        const timeMs = pt.obs.endMs;
+                        const intervalTenths = Math.round(tickIntervalMs * 10);
+                        const timeTenths = Math.round(timeMs * 10);
+                        const isIntervalTick = timeTenths % intervalTenths === 0;
+
+                        // Only show label if it aligns with the interval and maintains minimum distance to prevent text collisions
+                        const canShowLabel = isIntervalTick && (pt.endX - lastLabelX >= MIN_LABEL_DISTANCE_PX);
+                        if (canShowLabel) {
+                          lastLabelX = pt.endX;
+                        }
+
+                        const labelStr = `${timeMs.toFixed(1)} ms`;
+
+                        return (
+                          <g key={`x-tick-${pt.obs.id || idx}`}>
+                            <line
+                              x1={pt.endX}
+                              y1="205"
+                              x2={pt.endX}
+                              y2={isIntervalTick ? "211" : "208"}
+                              stroke={isIntervalTick ? "#64748B" : "#CBD5E1"}
+                              strokeWidth={isIntervalTick ? 1.2 : 1}
+                            />
+                            {canShowLabel && (
+                              <text
+                                x={pt.endX}
+                                y="222"
+                                textAnchor="middle"
+                                className="text-[10px] font-mono fill-slate-500 font-semibold select-none"
+                              >
+                                {labelStr}
+                              </text>
+                            )}
+                          </g>
+                        );
+                      })}
+                    </>
                   );
-                })}
+                })()}
               </svg>
 
               {/* Clean Minimal Hover Tooltip: Shows ONLY the frequency */}
@@ -859,11 +1213,23 @@ export default function ObservationsSection({
                   <span className="text-emerald-700 font-bold">HIT</span>
                 </div>
               )}
-              {showMisses && (
+              {showMisses && viewMode === 'receiver' && (
                 <div className="flex items-center gap-1.5">
                   <span className="w-4 h-1 rounded bg-[#F59E0B]" />
-                  <span className="text-amber-700 font-medium">Scan Miss</span>
+                  <span className="text-amber-700 font-medium">Scan Miss <span className="text-[10px] font-normal text-amber-600">(scan miss or quiet miss)</span></span>
                 </div>
+              )}
+              {showMisses && viewMode === 'environment' && (
+                <>
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-4 h-1 rounded bg-[#F59E0B]" />
+                    <span className="text-amber-700 font-medium">Scan Miss <span className="text-[10px] font-normal text-amber-600">(active emission)</span></span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-4 h-1 rounded bg-[#94A3B8]" />
+                    <span className="text-slate-500 font-medium">Quiet Miss <span className="text-[10px] font-normal text-slate-400">(no emission)</span></span>
+                  </div>
+                </>
               )}
               {showActualEmissions && (
                 <>
@@ -884,19 +1250,59 @@ export default function ObservationsSection({
 
       {/* Tabular View Container */}
       {displayMode === 'table' && (
-        <div className="mt-4 flex flex-col w-full overflow-hidden" id="observation-table-display">
-          {/* Subtitle note on table */}
-          <div className="pb-2 text-[11px] text-slate-500 flex items-center justify-between">
-            <span>
-              Recorded dwell observations stream ({filteredTableRows.length} shown • {observations.length} total dwells)
+        <div className="mt-4 flex flex-col w-full relative" id="observation-table-display">
+          {/* Go to Top (Latest Entries) Arrow Button */}
+          {tableScrolledDown && (
+            <button
+              type="button"
+              onClick={handleJumpToLatestTable}
+              className="absolute right-4 bottom-4 z-30 w-8 h-8 rounded-full bg-slate-900/90 hover:bg-slate-900 text-white shadow-xl border border-slate-700/80 flex items-center justify-center transition-all cursor-pointer hover:scale-110 active:scale-95 backdrop-blur-xs group"
+              title="Go to top (latest 20 entries)"
+              id="btn-table-jump-latest"
+            >
+              <span className="material-symbols-outlined text-[19px] text-white group-hover:-translate-y-0.5 transition-transform">
+                arrow_upward
+              </span>
+            </button>
+          )}
+          {/* Subtitle note on table with Intercepted Only toggle */}
+          <div className="pb-2 text-[11px] text-slate-500 flex flex-wrap items-center justify-between gap-2">
+            <span className="font-mono font-semibold text-slate-700 text-xs">
+              {filteredTableRows.length} / {totalDwells || observations.length}
             </span>
-            <span className="font-mono text-[10px] text-slate-400">Scroll downwards to load previous decisions</span>
+            <div className="flex items-center gap-2.5">
+              <span className="font-mono text-[10px] text-slate-400 hidden sm:inline">
+                {isInteractive ? 'Scroll down or use button to load earlier' : 'Live stream active'}
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  setTableShowInterceptedOnly((prev) => !prev);
+                  setTableVisibleCount(CHUNK_SIZE);
+                }}
+                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer shadow-2xs border ${
+                  tableShowInterceptedOnly
+                    ? 'bg-emerald-50 text-emerald-800 border-emerald-300 ring-1 ring-emerald-300'
+                    : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50 hover:text-slate-900'
+                }`}
+                title="Toggle between showing only intercepted dwells (hits) and all dwells"
+              >
+                <span className={`material-symbols-outlined text-[15px] ${tableShowInterceptedOnly ? 'text-emerald-600' : 'text-slate-400'}`}>
+                  {tableShowInterceptedOnly ? 'check_circle' : 'radio_button_unchecked'}
+                </span>
+                <span>Intercepted Only</span>
+              </button>
+            </div>
           </div>
 
-          {/* Scrollable table container with infinite scroll downwards */}
+          {/* Scrollable table container with visible high-contrast scrollbar */}
           <div
-            className="max-h-[340px] overflow-y-auto overflow-x-auto rounded-xl border border-slate-200 shadow-2xs"
+            className="max-h-[340px] overflow-y-scroll overflow-x-auto rounded-xl border border-slate-200 shadow-2xs [scrollbar-width:thin] [scrollbar-color:#94a3b8_#f8fafc]"
             id="observation-table-scroll-area"
+            style={{
+              scrollbarWidth: 'thin',
+              scrollbarColor: '#94a3b8 #f8fafc',
+            }}
             onScroll={handleTableScroll}
           >
             <table className="w-full text-left text-xs font-label-sm border-collapse min-w-[620px]">
@@ -906,6 +1312,7 @@ export default function ObservationsSection({
                   <th className="py-2.5 px-3.5 text-slate-600 font-bold uppercase tracking-wider text-[10.5px] whitespace-nowrap">Selected Band</th>
                   <th className="py-2.5 px-3.5 text-slate-600 font-bold uppercase tracking-wider text-[10.5px] whitespace-nowrap">Intercepted Frequency</th>
                   <th className="py-2.5 px-3.5 text-slate-600 font-bold uppercase tracking-wider text-[10.5px] whitespace-nowrap">Result</th>
+                  <th className="py-2.5 px-3.5 text-slate-600 font-bold uppercase tracking-wider text-[10.5px] whitespace-nowrap">Reward</th>
                   <th className="py-2.5 px-3.5 text-slate-600 font-bold uppercase tracking-wider text-[10.5px] whitespace-nowrap">Pulses Detected</th>
                   {viewMode === 'environment' && (
                     <th className="py-2.5 px-3.5 text-emerald-800 font-bold uppercase tracking-wider text-[10.5px] whitespace-nowrap">Active Emissions in Window (Exact Freq)</th>
@@ -937,11 +1344,35 @@ export default function ObservationsSection({
                           <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-800 border border-emerald-200 font-bold shadow-2xs">
                             HIT
                           </span>
-                        ) : (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-amber-50 text-amber-700 border border-amber-200 font-medium shadow-2xs">
+                        ) : viewMode === 'receiver' ? (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-amber-50 text-amber-700 border border-amber-200 font-medium shadow-2xs" title="Scan Miss: Receiver detected 0 transmissions in this dwell window">
                             SCAN MISS
                           </span>
+                        ) : (row.hasEmission || (row.actualEmissions && row.actualEmissions.length > 0) || (row.actualBands && row.actualBands.length > 0)) ? (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-amber-50 text-amber-700 border border-amber-200 font-medium shadow-2xs" title="Active emission was present in spectrum but receiver was on a different band">
+                            SCAN MISS
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-slate-50 text-slate-500 border border-slate-200 font-medium shadow-2xs" title="No emission active — idle dwell window">
+                            QUIET MISS
+                          </span>
                         )}
+                      </td>
+                      <td className="py-2.5 px-3.5 whitespace-nowrap font-mono text-[11px]">
+                        <span
+                          className={`inline-flex items-center px-2 py-0.5 rounded-md font-bold text-[10.5px] shadow-2xs ${
+                            (row.reward !== undefined ? Number(row.reward) : (row.isIntercepted ? 0.02 : -0.01)) > 0
+                              ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                              : (row.reward !== undefined ? Number(row.reward) : (row.isIntercepted ? 0.02 : -0.01)) < 0
+                              ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                              : 'bg-slate-50 text-slate-600 border border-slate-200'
+                          }`}
+                        >
+                          {(() => {
+                            const r = row.reward !== undefined ? Number(row.reward) : (row.isIntercepted ? 0.02 : -0.01);
+                            return r > 0 ? `+${r.toFixed(2)}` : r.toFixed(2);
+                          })()}
+                        </span>
                       </td>
                       <td className="py-2.5 px-3.5 whitespace-nowrap font-mono">
                         <span className="font-semibold text-slate-700">{row.pulsesDetected}</span>
@@ -976,7 +1407,7 @@ export default function ObservationsSection({
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={viewMode === 'environment' ? 6 : 5} className="py-8 text-center text-slate-400 select-none">
+                    <td colSpan={viewMode === 'environment' ? 7 : 6} className="py-8 text-center text-slate-400 select-none">
                       No dwell records in this window matching the selected filter.
                     </td>
                   </tr>
@@ -984,7 +1415,7 @@ export default function ObservationsSection({
                 {/* Inline loading indicator at the bottom of the table: ONLY spinning icon, no text */}
                 {isLoadingEarlierTable && (
                   <tr>
-                    <td colSpan={viewMode === 'environment' ? 6 : 5} className="py-3 bg-slate-50/90 border-t border-slate-200 text-center">
+                    <td colSpan={viewMode === 'environment' ? 7 : 6} className="py-3 bg-slate-50/90 border-t border-slate-200 text-center">
                       <div className="inline-flex items-center justify-center">
                         <span className="material-symbols-outlined text-[18px] text-primary animate-spin">
                           progress_activity
@@ -996,6 +1427,8 @@ export default function ObservationsSection({
               </tbody>
             </table>
           </div>
+
+
         </div>
       )}
     </div>
