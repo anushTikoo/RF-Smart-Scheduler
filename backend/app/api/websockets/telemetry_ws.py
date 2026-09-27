@@ -97,9 +97,15 @@ async def websocket_telemetry_endpoint(
                     last_reported_computed = si
 
                 elif cmd == "pause":
+                    if "dwell_index" in cmd_data:
+                        current_index = max(0, min(total_dwells, int(cmd_data["dwell_index"])))
+                        last_reported_computed = current_index
                     is_active = False
 
                 elif cmd == "resume":
+                    if "dwell_index" in cmd_data:
+                        current_index = max(0, min(total_dwells, int(cmd_data["dwell_index"])))
+                        last_reported_computed = current_index
                     is_active = True
 
                 elif cmd == "replay":

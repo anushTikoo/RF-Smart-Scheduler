@@ -161,6 +161,8 @@ def test_websocket_telemetry(client):
         # Send step command
         ws.send_json({"command": "step"})
         step_msg = ws.receive_json()
+        while step_msg.get("mode") == "batch":
+            step_msg = ws.receive_json()
         assert step_msg["mode"] == "slow"
         assert "singleDwell" in step_msg
 

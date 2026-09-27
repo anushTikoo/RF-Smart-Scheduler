@@ -47,6 +47,13 @@ export const DWELL_DURATION_MS = 0.5;
 let activeSocket = null;
 
 /**
+ * Check if the WebSocket session is currently active and open.
+ */
+export function isTelemetryConnected() {
+  return Boolean(activeSocket && activeSocket.readyState === WebSocket.OPEN);
+}
+
+/**
  * Dispatch a command message to the running backend WebSocket session.
  */
 export function sendTelemetryCommand(commandObj) {
@@ -76,6 +83,7 @@ export function subscribeTelemetry(onUpdate, options = {}) {
     batchSize = 20,
     intervalMs = mode === 'batch' ? 250 : 750,
     startIndex = 0,
+    getStartIndex,
     autoStart = true,
   } = options;
 
@@ -86,7 +94,8 @@ export function subscribeTelemetry(onUpdate, options = {}) {
     if (isClosedManually) return;
 
     const baseWs = WS_BASE_URL.replace(/^http/, 'ws');
-    const wsUrl = `${baseWs}/ws/telemetry?mode=${mode}&batch_size=${batchSize}&interval_ms=${intervalMs}&auto_start=${autoStart}&start_index=${startIndex}`;
+    const startIdx = typeof getStartIndex === 'function' ? getStartIndex() : startIndex;
+    const wsUrl = `${baseWs}/ws/telemetry?mode=${mode}&batch_size=${batchSize}&interval_ms=${intervalMs}&auto_start=${autoStart}&start_index=${startIdx}`;
 
     const ws = new WebSocket(wsUrl);
     activeSocket = ws;

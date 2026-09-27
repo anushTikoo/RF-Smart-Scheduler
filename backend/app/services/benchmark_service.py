@@ -11,12 +11,22 @@ from smart_scan.data.episode import Episode
 from smart_scan.env.scan_env import ReceiverConfig, RewardConfig, ScanEnvironment
 from smart_scan.features.context import BandContextConfig
 from smart_scan.schedulers.base import Scheduler
-from smart_scan.schedulers.baselines import (
-    OracleScheduler,
-    RandomScheduler,
-    RoundRobinScheduler,
-)
+from smart_scan.schedulers.baselines import RoundRobinScheduler
 from smart_scan.schedulers.linucb import LinUCBScheduler
+
+
+class RandomScheduler(Scheduler):
+    name = "random"
+
+    def select_action(self, env: ScanEnvironment) -> int:
+        return int(self.rng.integers(0, env.episode.num_bands))
+
+
+class OracleScheduler(Scheduler):
+    name = "oracle"
+
+    def select_action(self, env: ScanEnvironment) -> int:
+        return env.oracle_action()
 
 
 class BenchmarkService:
@@ -43,9 +53,8 @@ class BenchmarkService:
                 regularization=regularization,
                 shared_model=True,
                 context_version="v2",
-                predictor_enabled=True,
-                pulse_count_reference=128.0,
-                no_hit_reference=5.0,
+                pulse_count_reference=context_cfg.pulse_count_reference if context_cfg else 21.0,
+                no_hit_reference=context_cfg.no_hit_reference if context_cfg else 5.0,
             ),
             "round_robin": RoundRobinScheduler(),
             "random": RandomScheduler(),
