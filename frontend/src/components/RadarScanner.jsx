@@ -5,7 +5,7 @@ function InfoTooltip({ formula }) {
   return (
     <div className="relative group inline-flex items-center">
       <span
-        className="w-4 h-4 rounded-full bg-slate-200/90 group-hover:bg-primary/20 text-slate-600 group-hover:text-primary transition-colors flex items-center justify-center text-[10px] font-mono font-bold cursor-help select-none"
+        className="w-4 h-4 rounded-full bg-slate-200/90 group-hover:bg-primary/20 text-slate-600 group-hover:text-primary transition-colors flex items-center justify-center text-[11px] font-mono font-bold cursor-help select-none"
       >
         ?
       </span>
@@ -104,16 +104,14 @@ export default function RadarScanner({
   const wedgePathOuter = bandInfo ? getSectorPath(200, 200, RADAR_RADIUS, bandInfo.startDeg, bandInfo.endDeg) : null;
 
   return (
-    <div className={`bg-white rounded-2xl shadow-[0_2px_10px_rgba(0,0,0,0.04)] border border-slate-200 ${
-      !showCircularScan ? 'p-3 sm:p-3.5' : 'p-3.5 sm:p-4'
-    } flex flex-col justify-between items-center transition-all`}>
+    <div className="bg-white rounded-2xl shadow-[0_2px_10px_rgba(0,0,0,0.04)] border border-slate-200 p-4 sm:p-5 flex flex-col justify-between items-center transition-all">
       {/* Card Header: Relevant Domain Icons */}
-      <div className="w-full flex items-center justify-between pb-2 border-b border-slate-100">
-        <div className="flex items-center gap-1.5">
+      <div className="w-full flex items-center justify-between pb-3 mb-3 border-b border-slate-100">
+        <div className="flex items-center gap-2">
           {/* Meaningful Domain Icon representing Adaptive ML vs Open-Loop Fixed Sweep */}
           {isAdaptive ? (
             <span
-              className="material-symbols-outlined text-[18px] text-primary select-none drop-shadow-[0_0_8px_rgba(0,198,215,0.6)]"
+              className="material-symbols-outlined text-[18px] text-primary select-none"
               title="Adaptive ML: Cognitive Band Scheduling (LinUCB Contextual Bandit)"
             >
               neurology
@@ -127,27 +125,27 @@ export default function RadarScanner({
             </span>
           )}
           <div className="flex items-center gap-1">
-            <h2 className="font-label-md text-[11px] font-semibold text-on-surface uppercase tracking-wider">
+            <h2 className="font-label-md text-[14px] font-semibold text-on-surface uppercase tracking-wider">
               {title}
             </h2>
           </div>
         </div>
 
-        {/* Scanning Badge on each scanner (Micro compact size) */}
+        {/* Scanning Badge on each scanner */}
         {hasDataset && (
           <div
-            className={`flex items-center gap-1 px-1.5 py-0.5 rounded-md font-label-md text-[8.5px] font-semibold tracking-wide select-none shadow-2xs ${
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md font-label-md text-[11px] font-semibold tracking-wider select-none shadow-2xs ${
               isCompleted
-                ? 'bg-blue-50 border border-blue-200 text-blue-700'
+                ? 'bg-emerald-50 border border-emerald-200 text-emerald-800'
                 : isScanning
                   ? 'bg-emerald-50 border border-emerald-200/90 text-emerald-700'
                   : 'bg-slate-100 border border-slate-200 text-slate-600'
             }`}
           >
             <span
-              className={`material-symbols-outlined text-[10.5px] ${
+              className={`material-symbols-outlined text-[13px] ${
                 isCompleted
-                  ? 'text-blue-600'
+                  ? 'text-emerald-700'
                   : isScanning
                     ? 'text-emerald-600 animate-spin'
                     : 'text-slate-400'
@@ -164,7 +162,7 @@ export default function RadarScanner({
       {/* Visual Scan Presentation: Compact High-Speed Running Status in Live Mode, Circular Radar Wheel in Slow Replay */}
       {!showCircularScan ? (
         !isCompleted ? (
-          <div className="w-full my-1.5 py-1 px-2.5 rounded-md bg-slate-50 border border-slate-200/80 flex items-center justify-between gap-1.5 shadow-2xs select-none">
+          <div className="w-full my-1.5 py-1.5 px-3 rounded-md bg-slate-50 border border-slate-200/80 flex items-center justify-between gap-1.5 shadow-2xs select-none">
             <div className="flex items-center gap-1.5">
               <span className="relative flex h-1.5 w-1.5">
                 {isScanning && (
@@ -176,14 +174,14 @@ export default function RadarScanner({
                   }`}
                 ></span>
               </span>
-              <span className="text-slate-700 font-semibold text-[10px]">
+              <span className="text-slate-700 font-semibold text-[12px]">
                 {isScanning
                   ? (isAdaptive ? 'Model Running (LinUCB)' : 'Sequential Sweep Running')
                   : (hasDataset ? 'Simulation Paused' : 'Awaiting Dataset')}
               </span>
             </div>
             <div className="flex items-center gap-1">
-              <span className="text-[9px] font-mono text-slate-500 font-medium">
+              <span className="text-[11px] font-mono text-slate-500 font-medium">
                 {isScanning ? 'Status: Active' : 'Status: Idle'}
               </span>
             </div>
@@ -210,8 +208,8 @@ export default function RadarScanner({
             ))}
           </g>
 
-          {/* Active Wedge Sector Highlight (Receiver Scanned Band - rendered ONLY when actively scanning with a dataset) */}
-          {hasDataset && isScanning && wedgePathOuter && (
+          {/* Active Wedge Sector Highlight (Receiver Scanned Band - rendered when dataset has active band) */}
+          {hasDataset && wedgePathOuter && (
             isAdaptive ? (
               <path
                 d={wedgePathOuter}
@@ -234,7 +232,7 @@ export default function RadarScanner({
           )}
 
           {/* Environmental View: Actual Target Emission Band Highlights */}
-          {viewMode === 'environment' && hasDataset && isScanning && emissionBands.length > 0 && (
+          {viewMode === 'environment' && hasDataset && emissionBands.length > 0 && (
             emissionBands.map((eBandId) => {
               const eInfo = BAND_CONFIG.find((b) => b.id === eBandId);
               if (!eInfo) return null;
@@ -249,7 +247,7 @@ export default function RadarScanner({
                   stroke="#10B981"
                   strokeWidth={isHitThisBand ? "3" : "2.2"}
                   strokeDasharray={isHitThisBand ? "none" : "5 2.5"}
-                  className="pointer-events-none drop-shadow-[0_0_8px_rgba(16,185,129,0.7)]"
+                  className="pointer-events-none"
                 />
               );
             })
@@ -284,16 +282,16 @@ export default function RadarScanner({
         </svg>
 
         {/* Frequency Ticks Around Perimeter */}
-        <div className="absolute top-1 left-1/2 -translate-x-1/2 font-mono text-[9px] font-semibold text-slate-500 bg-white/75 px-1 py-0.5 select-none whitespace-nowrap z-10">
+        <div className="absolute top-1 left-1/2 -translate-x-1/2 font-mono text-[11px] font-medium text-slate-500 bg-white/85 px-1.5 py-0.5 rounded select-none whitespace-nowrap z-10 shadow-2xs">
           18 GHz / 500 MHz
         </div>
-        <div className="absolute -right-6 sm:-right-8 top-1/2 -translate-y-1/2 font-mono text-[9px] font-semibold text-slate-500 bg-white/75 px-1 py-0.5 select-none whitespace-nowrap z-10">
+        <div className="absolute -right-6 sm:-right-8 top-1/2 -translate-y-1/2 font-mono text-[11px] font-medium text-slate-500 bg-white/85 px-1.5 py-0.5 rounded select-none whitespace-nowrap z-10 shadow-2xs">
           4.88 GHz
         </div>
-        <div className="absolute bottom-1 left-1/2 -translate-x-1/2 font-mono text-[9px] font-semibold text-slate-500 bg-white/75 px-1 py-0.5 select-none whitespace-nowrap z-10">
+        <div className="absolute bottom-1 left-1/2 -translate-x-1/2 font-mono text-[11px] font-medium text-slate-500 bg-white/85 px-1.5 py-0.5 rounded select-none whitespace-nowrap z-10 shadow-2xs">
           9.25 GHz
         </div>
-        <div className="absolute -left-6 sm:-left-8 top-1/2 -translate-y-1/2 font-mono text-[9px] font-semibold text-slate-500 bg-white/75 px-1 py-0.5 select-none whitespace-nowrap z-10">
+        <div className="absolute -left-6 sm:-left-8 top-1/2 -translate-y-1/2 font-mono text-[11px] font-medium text-slate-500 bg-white/85 px-1.5 py-0.5 rounded select-none whitespace-nowrap z-10 shadow-2xs">
           13.63 GHz
         </div>
       </div>
@@ -301,49 +299,49 @@ export default function RadarScanner({
       {/* Receiver View Band Info Banner: Strict Fixed Height (58px) so card size never shifts */}
       {viewMode === 'receiver' && (
         !isCompleted && (
-          hasDataset && isScanning && bandInfo ? (
-            <div className="w-full my-1.5 h-[58px] min-h-[58px] max-h-[58px] flex flex-col justify-center gap-1 py-1.5 px-3 rounded-xl bg-slate-50 border border-slate-200/90 text-[11px] font-medium select-none shadow-2xs overflow-hidden">
+          hasDataset && bandInfo ? (
+            <div className="w-full my-1.5 h-[58px] min-h-[58px] max-h-[58px] flex flex-col justify-center gap-1 py-1.5 px-3 rounded-xl bg-slate-50 border border-slate-200/90 text-[12px] font-medium select-none shadow-2xs overflow-hidden">
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2 truncate">
                   <span
-                    className={`w-3 h-3 rounded-xs shrink-0 ${
-                      isAdaptive ? 'bg-[#00C6D7]/40 border border-[#00C6D7]' : 'bg-slate-300 border border-slate-500'
+                    className={`w-3.5 h-3.5 rounded-xs shrink-0 ${
+                      isAdaptive ? 'bg-primary/20 border border-primary' : 'bg-slate-200 border border-slate-400'
                     }`}
                   />
-                  <span className="text-slate-700 font-semibold truncate">
-                    {isAdaptive ? 'Scheduled Band' : 'Sweep Band'}: <span className="font-mono text-slate-900 font-bold">Band {bandInfo.id}</span>
-                    <span className="text-slate-500 font-mono text-[10.5px] ml-1.5 font-normal">({bandInfo.range})</span>
+                  <span className="text-slate-700 font-medium truncate text-[12px]">
+                    {isAdaptive ? 'Scheduled Band' : 'Sweep Band'}: <span className="font-mono text-slate-900 font-semibold text-[13px]">Band {bandInfo.id}</span>
+                    <span className="text-slate-500 font-mono text-[11px] ml-1.5 font-normal">({bandInfo.range})</span>
                   </span>
                 </div>
 
                 {/* Intercept / Detection Status */}
                 {isIntercepted ? (
-                  <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-900 font-bold text-[10px] tracking-wide uppercase border border-emerald-300 shadow-2xs shrink-0">
-                    INTERCEPTED (HIT) • <span className="font-mono text-emerald-950 font-extrabold">{detectedFreq}</span>
+                  <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-900 font-semibold text-[11px] tracking-wide uppercase border border-emerald-300 shadow-2xs shrink-0 font-sans">
+                    INTERCEPTED (HIT) • <span className="font-mono text-emerald-950 font-semibold">{detectedFreq}</span>
                   </span>
                 ) : (
-                  <span className="px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-700 font-semibold text-[10px] tracking-wide uppercase border border-amber-200 shrink-0">
+                  <span className="px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200 font-semibold text-[11px] tracking-wide uppercase shrink-0 font-sans">
                     SCAN MISS / MISSED OPPORTUNITY
                   </span>
                 )}
               </div>
             </div>
           ) : !isScanning && hasDataset ? (
-            <div className="w-full my-1.5 h-[58px] min-h-[58px] max-h-[58px] flex items-center justify-between gap-2 py-1.5 px-3 rounded-xl bg-slate-50/70 border border-slate-200/70 text-[11px] text-slate-500 font-medium select-none overflow-hidden">
+            <div className="w-full my-1.5 h-[58px] min-h-[58px] max-h-[58px] flex items-center justify-between gap-2 py-1.5 px-3 rounded-xl bg-slate-50/70 border border-slate-200/70 text-[12px] text-slate-500 font-medium select-none overflow-hidden">
               <span className="flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-slate-300" />
                 <span>Simulation paused. Press Resume Simulation to continue.</span>
               </span>
             </div>
           ) : !hasDataset ? (
-            <div className="w-full my-1.5 h-[58px] min-h-[58px] max-h-[58px] flex items-center justify-between gap-2 py-1.5 px-3 rounded-xl bg-slate-50/70 border border-slate-200/70 text-[11px] text-slate-500 font-medium select-none overflow-hidden">
+            <div className="w-full my-1.5 h-[58px] min-h-[58px] max-h-[58px] flex items-center justify-between gap-2 py-1.5 px-3 rounded-xl bg-slate-50/70 border border-slate-200/70 text-[12px] text-slate-500 font-medium select-none overflow-hidden">
               <span className="flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-slate-300" />
                 <span>No active scan. Upload a dataset to begin band scheduling.</span>
               </span>
             </div>
           ) : (
-            <div className="w-full my-1.5 h-[58px] min-h-[58px] max-h-[58px] flex items-center justify-between gap-2 py-1.5 px-3 rounded-xl bg-slate-50/70 border border-slate-200/70 text-[11px] text-slate-500 font-medium select-none overflow-hidden">
+            <div className="w-full my-1.5 h-[58px] min-h-[58px] max-h-[58px] flex items-center justify-between gap-2 py-1.5 px-3 rounded-xl bg-slate-50/70 border border-slate-200/70 text-[12px] text-slate-500 font-medium select-none overflow-hidden">
               <span className="flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
                 <span>Scanning spectrum bands...</span>
@@ -356,39 +354,39 @@ export default function RadarScanner({
       {/* Environmental View Legend: Strict Fixed Height (58px) with single-row scrollable chips so card size never shifts */}
       {viewMode === 'environment' && (
         !isCompleted && (
-          hasDataset && isScanning && bandInfo ? (
-            <div className="w-full my-1.5 h-[58px] min-h-[58px] max-h-[58px] flex flex-col justify-center gap-1 py-1.5 px-3 rounded-xl bg-slate-50 border border-slate-200/90 text-[11px] font-medium select-none shadow-2xs overflow-hidden">
+          hasDataset && bandInfo ? (
+            <div className="w-full my-1.5 h-[58px] min-h-[58px] max-h-[58px] flex flex-col justify-center gap-1 py-1.5 px-3 rounded-xl bg-slate-50 border border-slate-200/90 text-[12px] font-medium select-none shadow-2xs overflow-hidden">
               {/* Line 1: Scheduled Band & Detection Status */}
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-1.5 truncate">
                   <span
-                    className={`w-3 h-3 rounded-xs shrink-0 ${
-                      isAdaptive ? 'bg-[#00C6D7]/40 border border-[#00C6D7]' : 'bg-slate-300 border border-slate-500'
+                    className={`w-3.5 h-3.5 rounded-xs shrink-0 ${
+                      isAdaptive ? 'bg-primary/20 border border-primary' : 'bg-slate-200 border border-slate-400'
                     }`}
                   />
-                  <span className="text-slate-700 font-semibold truncate">
-                    {isAdaptive ? 'Scheduled Band' : 'Sweep Band'}: <span className="font-mono text-slate-900 font-bold">Band {bandInfo.id}</span>
-                    <span className="text-slate-500 font-mono text-[10px] ml-1 font-normal">({bandInfo.range})</span>
+                  <span className="text-slate-700 font-medium truncate text-[12px]">
+                    {isAdaptive ? 'Scheduled Band' : 'Sweep Band'}: <span className="font-mono text-slate-900 font-semibold text-[13px]">Band {bandInfo.id}</span>
+                    <span className="text-slate-500 font-mono text-[11px] ml-1 font-normal">({bandInfo.range})</span>
                   </span>
                 </div>
 
                 {/* Intercept Status Indicator */}
                 {isIntercepted ? (
-                  <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-900 font-bold text-[10px] tracking-wide uppercase border border-emerald-300 shadow-2xs shrink-0">
-                    INTERCEPTED (HIT) • <span className="font-mono text-emerald-950 font-extrabold">{detectedFreq}</span>
+                  <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-900 font-semibold text-[11px] tracking-wide uppercase border border-emerald-300 shadow-2xs shrink-0 font-sans">
+                    INTERCEPTED (HIT) • <span className="font-mono text-emerald-950 font-semibold">{detectedFreq}</span>
                   </span>
                 ) : (
-                  <span className="px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 font-semibold text-[10px] tracking-wide uppercase border border-amber-200 shrink-0">
+                  <span className="px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200 font-semibold text-[11px] tracking-wide uppercase shrink-0 font-sans">
                     SCAN MISS / MISSED OPPORTUNITY
                   </span>
                 )}
               </div>
 
-              {/* Line 2: Actual Emission Bands (Single horizontal row with chips, never wraps or expands height) */}
+              {/* Line 2: Actual Emission Bands */}
               {emissionBands.length > 0 ? (
-                <div className="flex items-center gap-1.5 overflow-x-auto whitespace-nowrap text-[10px] py-0.5">
+                <div className="flex items-center gap-1.5 overflow-x-auto whitespace-nowrap text-[11px] py-0.5">
                   <span className="w-2.5 h-2.5 rounded-xs bg-emerald-500/20 border-2 border-dashed border-emerald-500 shadow-2xs shrink-0" />
-                  <span className="text-emerald-800 font-bold shrink-0">
+                  <span className="text-emerald-800 font-semibold shrink-0">
                     {emissionBandInfos.length > 1 ? 'Actual Emissions:' : 'Actual Emission:'}
                   </span>
                   <div className="flex items-center gap-1 shrink-0">
@@ -397,9 +395,9 @@ export default function RadarScanner({
                       return (
                         <span
                           key={`eband-label-${eInfo.id}`}
-                          className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9.5px] font-mono ${
+                          className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[11px] font-mono ${
                             isCaughtThis
-                              ? 'bg-emerald-100 border border-emerald-300 text-emerald-950 font-bold'
+                              ? 'bg-emerald-100 border border-emerald-300 text-emerald-950 font-semibold'
                               : 'bg-slate-100 border border-slate-200 text-slate-700 font-normal'
                           }`}
                         >
@@ -411,28 +409,28 @@ export default function RadarScanner({
                   </div>
                 </div>
               ) : (
-                <div className="flex items-center gap-1.5 text-[10px] text-slate-400 py-0.5">
+                <div className="flex items-center gap-1.5 text-[11px] text-slate-400 py-0.5">
                   <span className="w-2 h-2 rounded-full bg-slate-300 shrink-0" />
                   <span>No active emissions (quiet spectrum window)</span>
                 </div>
               )}
             </div>
           ) : !isScanning && hasDataset ? (
-            <div className="w-full my-1.5 h-[58px] min-h-[58px] max-h-[58px] flex items-center justify-between gap-2 py-1.5 px-3 rounded-xl bg-slate-50/70 border border-slate-200/70 text-[11px] text-slate-500 font-medium select-none overflow-hidden">
+            <div className="w-full my-2 h-[58px] min-h-[58px] max-h-[58px] flex items-center justify-between gap-2 py-2 px-3.5 rounded-xl bg-slate-50/70 border border-slate-200/70 text-[12px] text-slate-500 font-medium select-none overflow-hidden">
               <span className="flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-slate-300" />
                 <span>Simulation paused. Press Resume Simulation to continue.</span>
               </span>
             </div>
           ) : !hasDataset ? (
-            <div className="w-full my-1.5 h-[58px] min-h-[58px] max-h-[58px] flex items-center justify-between gap-2 py-1.5 px-3 rounded-xl bg-slate-50/70 border border-slate-200/70 text-[11px] text-slate-500 font-medium select-none overflow-hidden">
+            <div className="w-full my-2 h-[58px] min-h-[58px] max-h-[58px] flex items-center justify-between gap-2 py-2 px-3.5 rounded-xl bg-slate-50/70 border border-slate-200/70 text-[12px] text-slate-500 font-medium select-none overflow-hidden">
               <span className="flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-slate-300" />
                 <span>No active scan. Upload a dataset to view real-time emission comparison.</span>
               </span>
             </div>
           ) : (
-            <div className="w-full my-1.5 h-[58px] min-h-[58px] max-h-[58px] flex items-center justify-between gap-2 py-1.5 px-3 rounded-xl bg-slate-50/70 border border-slate-200/70 text-[11px] text-slate-500 font-medium select-none overflow-hidden">
+            <div className="w-full my-2 h-[58px] min-h-[58px] max-h-[58px] flex items-center justify-between gap-2 py-2 px-3.5 rounded-xl bg-slate-50/70 border border-slate-200/70 text-[12px] text-slate-500 font-medium select-none overflow-hidden">
               <span className="flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
                 <span>Scanning spectrum bands...</span>
@@ -445,14 +443,14 @@ export default function RadarScanner({
       )}
 
       {/* Enlarged Data Points Section: Specific to Receiver View vs Environment View */}
-      <div className={`w-full ${!showCircularScan ? 'pt-2 gap-2' : 'pt-3 gap-2.5'} border-t border-slate-100 flex flex-col`}>
+      <div className="w-full pt-3 mt-1 flex flex-col gap-3 border-t border-slate-100">
         {viewMode === 'receiver' ? (
           /* Receiver View Metrics: Strictly what the receiver knows (2 cards) */
-          <div className="grid grid-cols-2 gap-2 w-full">
+          <div className="grid grid-cols-2 gap-3 w-full">
             {/* Scan Hit Rate = Dwell Hits / Total Scanned Dwells */}
-            <div className={`flex flex-col justify-between ${!showCircularScan ? 'p-2.5' : 'p-3'} rounded-xl bg-slate-50 border border-slate-100 shadow-2xs`}>
+            <div className="flex flex-col justify-between p-3 sm:p-3.5 rounded-xl bg-slate-50 border border-slate-100 shadow-2xs text-left">
               <div className="flex items-center justify-between gap-1 w-full">
-                <span className="font-label-md text-[10px] font-bold text-slate-800 uppercase tracking-wide">
+                <span className="font-label-md text-[12px] font-medium text-slate-600 uppercase tracking-wide">
                   Scan Hit Rate
                 </span>
                 <InfoTooltip formula={`Formula: Dwell Hits / Total Scanned Dwells (Dwell Hits + Scan/Quiet Misses)
@@ -461,9 +459,9 @@ export default function RadarScanner({
 • Total Scanned Dwells: All monitored dwell windows (includes both scan misses and quiet idle windows)
 • From the receiver's perspective, quiet windows and missed transmissions cannot be differentiated`} />
               </div>
-              <div className="mt-1.5 flex items-baseline gap-1">
+              <div className="mt-2 flex items-baseline gap-1">
                 <span
-                  className={`font-mono ${!showCircularScan ? 'text-[20px] sm:text-[22px]' : 'text-[22px] sm:text-[24px]'} font-extrabold tracking-tight leading-none ${
+                  className={`font-mono text-[28px] sm:text-[32px] font-bold tracking-tight leading-none ${
                     isAdaptive ? 'text-primary' : 'text-slate-800'
                   }`}
                 >
@@ -473,18 +471,18 @@ export default function RadarScanner({
             </div>
 
             {/* Average Intercept Rate = Total successful interceptions / Total simulation time */}
-            <div className={`flex flex-col justify-between ${!showCircularScan ? 'p-2.5' : 'p-3'} rounded-xl bg-slate-50 border border-slate-100 shadow-2xs`}>
+            <div className="flex flex-col justify-between p-3 sm:p-3.5 rounded-xl bg-slate-50 border border-slate-100 shadow-2xs text-left">
               <div className="flex items-center justify-between gap-1 w-full">
-                <span className="font-label-md text-[10px] font-bold text-slate-800 uppercase tracking-wide">
+                <span className="font-label-md text-[12px] font-medium text-slate-600 uppercase tracking-wide">
                   Average Intercept Rate
                 </span>
                 <InfoTooltip formula={`Formula: Total Intercepted Pulses / Total Simulated RF Time (s)
 
 Measures intercepted pulse throughput over elapsed simulation time`} />
               </div>
-              <div className="mt-1.5 flex items-baseline gap-1">
+              <div className="mt-2 flex items-baseline gap-1">
                 <span
-                  className={`font-mono ${!showCircularScan ? 'text-[20px] sm:text-[22px]' : 'text-[22px] sm:text-[24px]'} font-extrabold tracking-tight leading-none ${
+                  className={`font-mono text-[28px] sm:text-[32px] font-bold tracking-tight leading-none ${
                     isAdaptive ? 'text-primary' : 'text-slate-800'
                   }`}
                 >
@@ -495,20 +493,20 @@ Measures intercepted pulse throughput over elapsed simulation time`} />
           </div>
         ) : (
           /* Environment View Metrics: 4 balanced cards in 2x2 grid */
-          <div className="grid grid-cols-2 gap-2 w-full">
+          <div className="grid grid-cols-2 gap-3 w-full">
             {/* Probability of Detection (Pd) = Detected emissions / Total actual emissions */}
-            <div className={`flex flex-col justify-between ${!showCircularScan ? 'p-2' : 'p-2.5'} rounded-xl bg-slate-50 border border-slate-100 shadow-2xs`}>
+            <div className="flex flex-col justify-between p-3 sm:p-3.5 rounded-xl bg-slate-50 border border-slate-100 shadow-2xs text-left">
               <div className="flex items-center justify-between gap-1 w-full">
-                <span className="font-label-md text-[9.5px] font-bold text-slate-800 uppercase tracking-wide">
+                <span className="font-label-md text-[12px] font-medium text-slate-600 uppercase tracking-wide">
                   Probability of Detection
                 </span>
                 <InfoTooltip formula={`Formula: Intercepted Pulses / Total Actual Observable Emission Pulses
 
 Ratio of RF pulses captured by the receiver versus all pulses generated by radar emitters`} />
               </div>
-              <div className="mt-1.5 flex items-baseline gap-1">
+              <div className="mt-2 flex items-baseline gap-1">
                 <span
-                  className={`font-mono ${!showCircularScan ? 'text-[18px] sm:text-[20px]' : 'text-[19px] sm:text-[21px]'} font-extrabold tracking-tight leading-none ${
+                  className={`font-mono text-[28px] sm:text-[32px] font-bold tracking-tight leading-none ${
                     isAdaptive ? 'text-primary' : 'text-slate-800'
                   }`}
                 >
@@ -518,18 +516,18 @@ Ratio of RF pulses captured by the receiver versus all pulses generated by radar
             </div>
 
             {/* Average Intercept Rate = Total successful interceptions / Total simulation time */}
-            <div className={`flex flex-col justify-between ${!showCircularScan ? 'p-2' : 'p-2.5'} rounded-xl bg-slate-50 border border-slate-100 shadow-2xs`}>
+            <div className="flex flex-col justify-between p-3 sm:p-3.5 rounded-xl bg-slate-50 border border-slate-100 shadow-2xs text-left">
               <div className="flex items-center justify-between gap-1 w-full">
-                <span className="font-label-md text-[9.5px] font-bold text-slate-800 uppercase tracking-wide">
+                <span className="font-label-md text-[12px] font-medium text-slate-600 uppercase tracking-wide">
                   Average Intercept Rate
                 </span>
                 <InfoTooltip formula={`Formula: Total Intercepted Pulses / Total Simulated RF Time (s)
 
 Measures intercepted pulse throughput over elapsed simulation time`} />
               </div>
-              <div className="mt-1.5 flex items-baseline gap-1">
+              <div className="mt-2 flex items-baseline gap-1">
                 <span
-                  className={`font-mono ${!showCircularScan ? 'text-[18px] sm:text-[20px]' : 'text-[19px] sm:text-[21px]'} font-extrabold tracking-tight leading-none ${
+                  className={`font-mono text-[28px] sm:text-[32px] font-bold tracking-tight leading-none ${
                     isAdaptive ? 'text-primary' : 'text-slate-800'
                   }`}
                 >
@@ -539,18 +537,18 @@ Measures intercepted pulse throughput over elapsed simulation time`} />
             </div>
 
             {/* Average Intercept Delay = Time between emission becoming observable and first receiver detection */}
-            <div className={`flex flex-col justify-between ${!showCircularScan ? 'p-2' : 'p-2.5'} rounded-xl bg-slate-50 border border-slate-100 shadow-2xs`}>
+            <div className="flex flex-col justify-between p-3 sm:p-3.5 rounded-xl bg-slate-50 border border-slate-100 shadow-2xs text-left">
               <div className="flex items-center justify-between gap-1 w-full">
-                <span className="font-label-md text-[9.5px] font-bold text-slate-800 uppercase tracking-wide">
+                <span className="font-label-md text-[12px] font-medium text-slate-600 uppercase tracking-wide">
                   Average Intercept Delay
                 </span>
                 <InfoTooltip formula={`Formula: Mean Elapsed Time from Emission Activation to First Detection
 
 Latency from when an emitter starts transmitting until the receiver tunes to that band and detects the first pulse`} />
               </div>
-              <div className="mt-1.5 flex items-baseline gap-1">
+              <div className="mt-2 flex items-baseline gap-1">
                 <span
-                  className={`font-mono ${!showCircularScan ? 'text-[18px] sm:text-[20px]' : 'text-[19px] sm:text-[21px]'} font-extrabold tracking-tight leading-none ${
+                  className={`font-mono text-[28px] sm:text-[32px] font-bold tracking-tight leading-none ${
                     isAdaptive ? 'text-primary' : 'text-slate-800'
                   }`}
                 >
@@ -560,9 +558,9 @@ Latency from when an emitter starts transmitting until the receiver tunes to tha
             </div>
 
             {/* Correct Scan Rate = Dwell Hits / (Dwell Hits + Missed Scan Emissions) */}
-            <div className={`flex flex-col justify-between ${!showCircularScan ? 'p-2' : 'p-2.5'} rounded-xl bg-slate-50 border border-slate-100 shadow-2xs`}>
+            <div className="flex flex-col justify-between p-3 sm:p-3.5 rounded-xl bg-slate-50 border border-slate-100 shadow-2xs text-left">
               <div className="flex items-center justify-between gap-1 w-full">
-                <span className="font-label-md text-[9.5px] font-bold text-slate-800 uppercase tracking-wide">
+                <span className="font-label-md text-[12px] font-medium text-slate-600 uppercase tracking-wide">
                   Correct Scan Rate
                 </span>
                 <InfoTooltip formula={`Formula: Dwell Hits / (Dwell Hits + Missed Scan Emissions)
@@ -571,9 +569,9 @@ Latency from when an emitter starts transmitting until the receiver tunes to tha
 • Missed Scan Emissions: Dwells with active emissions elsewhere in the spectrum
 • Excludes quiet idle steps with no RF emission`} />
               </div>
-              <div className="mt-1.5 flex items-baseline gap-1">
+              <div className="mt-2 flex items-baseline gap-1">
                 <span
-                  className={`font-mono ${!showCircularScan ? 'text-[18px] sm:text-[20px]' : 'text-[19px] sm:text-[21px]'} font-extrabold tracking-tight leading-none ${
+                  className={`font-mono text-[28px] sm:text-[32px] font-bold tracking-tight leading-none ${
                     isAdaptive ? 'text-primary' : 'text-slate-800'
                   }`}
                 >
@@ -587,85 +585,85 @@ Latency from when an emitter starts transmitting until the receiver tunes to tha
         {/* Supporting Counters Bar: different metrics per viewMode */}
         {viewMode === 'receiver' ? (
           /* Receiver view: 2 counters in one row — Dwell Hits, Det. Pulses (Receiver cannot see ground truth scan misses vs quiet misses or actual emission pulses) */
-          <div className="grid grid-cols-2 gap-2 w-full pt-0.5">
+          <div className="grid grid-cols-2 gap-3 w-full pt-1">
             <div
-              className="flex flex-col justify-between px-3 py-1.5 rounded-md bg-slate-100/70 text-slate-600 font-mono text-[10px] sm:text-[10.5px] min-h-[48px]"
+              className="flex flex-col justify-between px-3.5 py-2 rounded-lg bg-slate-100/70 text-slate-600 font-mono min-h-[52px] text-left"
               title="Dwell windows where receiver successfully tuned to an active emission band"
             >
-              <span className="text-slate-500 text-[9px] sm:text-[9.5px] leading-tight font-sans whitespace-normal">
+              <span className="text-slate-500 text-[11px] leading-tight font-sans whitespace-normal font-medium">
                 Dwell Hits
               </span>
-              <span className="font-bold text-slate-900 text-[10.5px] sm:text-[11px]">
+              <span className="font-semibold text-slate-900 text-[13px] sm:text-[14px]">
                 {hasDataset ? (metrics.dwellHits !== undefined && metrics.dwellHits !== '-' ? metrics.dwellHits : (metrics.totalHits || 0)) : '-'}
               </span>
             </div>
             <div
-              className="flex flex-col justify-between px-3 py-1.5 rounded-md bg-slate-100/70 text-slate-600 font-mono text-[10px] sm:text-[10.5px] min-h-[48px]"
+              className="flex flex-col justify-between px-3.5 py-2 rounded-lg bg-slate-100/70 text-slate-600 font-mono min-h-[52px] text-left"
               title="Total RF emission pulses successfully intercepted across all dwell windows"
             >
-              <span className="text-slate-500 text-[9px] sm:text-[9.5px] leading-tight font-sans whitespace-normal">
+              <span className="text-slate-500 text-[11px] leading-tight font-sans whitespace-normal font-medium">
                 Det. Pulses
               </span>
-              <span className="font-bold text-slate-900 text-[10.5px] sm:text-[11px]">
+              <span className="font-semibold text-slate-900 text-[13px] sm:text-[14px]">
                 {hasDataset ? (metrics.totalDetected || metrics.totalHits || 0) : '-'}
               </span>
             </div>
           </div>
         ) : (
           /* Environment view: All 6 metrics shown with multi-line clean labels */
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-1.5 w-full pt-0.5">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 w-full pt-1">
             <div
-              className="flex flex-col justify-between px-2 py-1.5 rounded-md bg-slate-100/70 text-slate-600 font-mono text-[10px] sm:text-[10.5px] min-h-[50px]"
+              className="flex flex-col justify-between px-2.5 py-2 rounded-lg bg-slate-100/70 text-slate-600 font-mono min-h-[52px] text-left"
               title="Dwell windows where receiver successfully tuned to an active emission band"
             >
-              <span className="text-slate-500 text-[9px] sm:text-[9.5px] leading-tight font-sans whitespace-normal">
+              <span className="text-slate-500 text-[11px] leading-tight font-sans whitespace-normal font-medium">
                 Dwell<br />Hits
               </span>
-              <span className="font-bold text-slate-900 text-[10px] sm:text-[10.5px]">
+              <span className="font-semibold text-slate-900 text-[13px] sm:text-[14px]">
                 {hasDataset ? (metrics.dwellHits !== undefined && metrics.dwellHits !== '-' ? metrics.dwellHits : (metrics.totalHits || 0)) : '-'}
               </span>
             </div>
             <div
-              className="flex flex-col justify-between px-2 py-1.5 rounded-md bg-slate-100/70 text-slate-600 font-mono text-[10px] sm:text-[10.5px] min-h-[50px]"
+              className="flex flex-col justify-between px-2.5 py-2 rounded-lg bg-slate-100/70 text-slate-600 font-mono min-h-[52px] text-left"
               title="Total RF emission pulses successfully intercepted across all dwell windows"
             >
-              <span className="text-slate-500 text-[9px] sm:text-[9.5px] leading-tight font-sans whitespace-normal">
+              <span className="text-slate-500 text-[11px] leading-tight font-sans whitespace-normal font-medium">
                 Det.<br />Pulses
               </span>
-              <span className="font-bold text-slate-900 text-[10px] sm:text-[10.5px]">
+              <span className="font-semibold text-slate-900 text-[13px] sm:text-[14px]">
                 {hasDataset ? (metrics.totalDetected || metrics.totalHits || 0) : '-'}
               </span>
             </div>
             <div
-              className="flex flex-col justify-between px-2 py-1.5 rounded-md bg-slate-100/70 text-slate-600 font-mono text-[10px] sm:text-[10.5px] min-h-[50px]"
+              className="flex flex-col justify-between px-2.5 py-2 rounded-lg bg-slate-100/70 text-slate-600 font-mono min-h-[52px] text-left"
               title="Dwell steps where receiver missed an active emission (scanned a different band)"
             >
-              <span className="text-slate-500 text-[9px] sm:text-[9.5px] leading-tight font-sans whitespace-normal">
+              <span className="text-slate-500 text-[11px] leading-tight font-sans whitespace-normal font-medium">
                 Scan Miss<br />Dwells
               </span>
-              <span className="font-bold text-slate-900 text-[10px] sm:text-[10.5px]">
+              <span className="font-semibold text-slate-900 text-[13px] sm:text-[14px]">
                 {hasDataset ? (metrics.totalScanMisses !== undefined && metrics.totalScanMisses !== '-' ? metrics.totalScanMisses : 0) : '-'}
               </span>
             </div>
             <div
-              className="flex flex-col justify-between px-2 py-1.5 rounded-md bg-slate-100/70 text-slate-600 font-mono text-[10px] sm:text-[10.5px] min-h-[50px]"
+              className="flex flex-col justify-between px-2.5 py-2 rounded-lg bg-slate-100/70 text-slate-600 font-mono min-h-[52px] text-left"
               title="Total RF emission pulses present in spectrum but not detected by receiver"
             >
-              <span className="text-slate-500 text-[9px] sm:text-[9.5px] leading-tight font-sans whitespace-normal">
+              <span className="text-slate-500 text-[11px] leading-tight font-sans whitespace-normal font-medium">
                 Missed<br />Pulses
               </span>
-              <span className="font-bold text-slate-900 text-[10px] sm:text-[10.5px]">
+              <span className="font-semibold text-slate-900 text-[13px] sm:text-[14px]">
                 {hasDataset ? (metrics.totalMisses !== undefined && metrics.totalMisses !== '-' ? metrics.totalMisses : 0) : '-'}
               </span>
             </div>
             <div
-              className="flex flex-col justify-between px-2 py-1.5 rounded-md bg-slate-100/70 text-slate-600 font-mono text-[10px] sm:text-[10.5px] min-h-[50px]"
+              className="flex flex-col justify-between px-2.5 py-2 rounded-lg bg-slate-100/70 text-slate-600 font-mono min-h-[52px] text-left"
               title="Total actual RF emission pulses generated by active radar emitters in the spectrum"
             >
-              <span className="text-slate-500 text-[9px] sm:text-[9.5px] leading-tight font-sans whitespace-normal">
+              <span className="text-slate-500 text-[11px] leading-tight font-sans whitespace-normal font-medium">
                 Actual<br />Pulses
               </span>
-              <span className="font-bold text-slate-900 text-[10px] sm:text-[10.5px]">
+              <span className="font-semibold text-slate-900 text-[13px] sm:text-[14px]">
                 {hasDataset ? (
                   metrics.totalActualEmissions !== undefined && metrics.totalActualEmissions !== '-'
                     ? metrics.totalActualEmissions
@@ -674,13 +672,13 @@ Latency from when an emitter starts transmitting until the receiver tunes to tha
               </span>
             </div>
             <div
-              className="flex flex-col justify-between px-2 py-1.5 rounded-md bg-slate-100/70 text-slate-600 font-mono text-[10px] sm:text-[10.5px] min-h-[50px]"
+              className="flex flex-col justify-between px-2.5 py-2 rounded-lg bg-slate-100/70 text-slate-600 font-mono min-h-[52px] text-left"
               title="Dwell windows where an active radar emission existed in spectrum (Dwell Hits + Scan Miss Dwells)"
             >
-              <span className="text-slate-500 text-[9px] sm:text-[9.5px] leading-tight font-sans whitespace-normal">
+              <span className="text-slate-500 text-[11px] leading-tight font-sans whitespace-normal font-medium">
                 Actual Em.<br />Dwells
               </span>
-              <span className="font-bold text-slate-900 text-[10px] sm:text-[10.5px]">
+              <span className="font-semibold text-slate-900 text-[13px] sm:text-[14px]">
                 {hasDataset ? (
                   metrics.dwellHits !== undefined && metrics.totalScanMisses !== undefined
                     ? (Number(metrics.dwellHits) + Number(metrics.totalScanMisses))

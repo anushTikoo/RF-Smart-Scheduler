@@ -105,19 +105,23 @@ class SimulationEngine:
                     "coverage_bonus_weight": 1.0,
                     "shared_model": True,
                     "context_version": "v2",
-                    "predictor_enabled": True,
                 },
             }
 
         self.receiver_cfg = receiver_config(self.raw_config)
         self.reward_cfg = reward_config(self.raw_config)
+
+        # Parse pulse_count_reference safely handling string or numeric
+        p_ref = self.raw_config.get("context", {}).get("pulse_count_reference", 21.0)
+        try:
+            p_ref_val = float(p_ref)
+        except (ValueError, TypeError):
+            p_ref_val = 21.0
+
         self.context_cfg = BandContextConfig(
-            version=str(self.raw_config.get("context", {}).get("version", "v2")),
-            predictor_enabled=bool(
-                self.raw_config.get("context", {}).get("predictor_enabled", True)
-            ),
-            pulse_count_reference=128.0,
-            no_hit_reference=5.0,
+            version="v2",
+            pulse_count_reference=p_ref_val,
+            no_hit_reference=float(self.raw_config.get("context", {}).get("no_hit_reference", 5.0)),
         )
 
         # Background computation state
@@ -213,10 +217,9 @@ class SimulationEngine:
         )
 
         ol_context_cfg = BandContextConfig(
-            version="v1",
-            predictor_enabled=False,
-            pulse_count_reference=128.0,
-            no_hit_reference=5.0,
+            version="v2",
+            pulse_count_reference=self.context_cfg.pulse_count_reference if self.context_cfg else 21.0,
+            no_hit_reference=self.context_cfg.no_hit_reference if self.context_cfg else 5.0,
         )
 
         self.env_ol = ScanEnvironment(
@@ -228,6 +231,12 @@ class SimulationEngine:
         )
 
         lin_opts = dict(self.raw_config.get("linucb", {}))
+        p_ref = lin_opts.get("pulse_count_reference", self.context_cfg.pulse_count_reference if self.context_cfg else 21.0)
+        try:
+            p_ref_val = float(p_ref)
+        except (ValueError, TypeError):
+            p_ref_val = 21.0
+
         self.linucb = LinUCBScheduler(
             alpha=float(lin_opts.get("alpha", 0.5)),
             regularization=float(lin_opts.get("regularization", 1.0)),
@@ -237,9 +246,8 @@ class SimulationEngine:
             coverage_bonus_weight=float(lin_opts.get("coverage_bonus_weight", 1.0)),
             shared_model=bool(lin_opts.get("shared_model", True)),
             context_version=str(lin_opts.get("context_version", "v2")),
-            predictor_enabled=bool(lin_opts.get("predictor_enabled", True)),
-            pulse_count_reference=128.0,
-            no_hit_reference=5.0,
+            pulse_count_reference=p_ref_val,
+            no_hit_reference=float(lin_opts.get("no_hit_reference", 5.0)),
         )
         self.linucb.reset(self.env_ml, seed=seed)
 

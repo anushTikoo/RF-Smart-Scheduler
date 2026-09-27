@@ -127,6 +127,7 @@ export default function App() {
   const observationsRef = useRef([]);
   const completedLiveStateRef = useRef(null);
   const hasLiveCompletedRef = useRef(false);
+  const latestDwellIndexRef = useRef(0);
   useEffect(() => {
     observationsRef.current = observations;
   }, [observations]);
@@ -194,9 +195,12 @@ export default function App() {
     };
   }, []);
 
+  // Active WebSocket session: stays connected while scanning OR while paused during slow replay
+  const isWsSessionActive = isScanning || (isSlowReplay && !isSimulationComplete);
+
   // Subscribe to live telemetry WebSocket stream
   useEffect(() => {
-    if (!isScanning) return;
+    if (!isWsSessionActive) return;
 
     const unsubscribe = subscribeTelemetry(
       (snapshot) => {
@@ -249,6 +253,7 @@ export default function App() {
           setObservations(newEntries);
           const latestIdx = snapshot.dwellIndex || snapshot.batchEndIndex || (snapshot.batch[snapshot.batch.length - 1]?.dwellIndex);
           if (latestIdx) {
+            latestDwellIndexRef.current = latestIdx;
             setScrubberTimeMs(Number((latestIdx * DWELL_DURATION_MS).toFixed(1)));
           }
           if (snapshot.isComplete) {
@@ -271,9 +276,46 @@ export default function App() {
           // Slow Replay Mode: Steps 1 dwell at a time for circular radar sweep
           const obsItem = dwellToObservation(snapshot.singleDwell);
           if (obsItem) {
-            setObservations((prev) => [...prev, obsItem]);
+            const curIdx = obsItem.dwellIndex || obsItem.id;
+            latestDwellIndexRef.current = curIdx;
+            setObservations((prev) => {
+              if (!prev || prev.length === 0) {
+                return [obsItem];
+              }
+              const lastItem = prev[prev.length - 1];
+              const lastIdx = lastItem ? (lastItem.dwellIndex || lastItem.id) : 0;
+
+              // 1. Strict monotonic sequential step: next dwell in order
+              if (curIdx === lastIdx + 1) {
+                return [...prev, obsItem];
+              }
+
+              // 2. Full replay / restart from dwell 1
+              if (curIdx === 1) {
+                return [obsItem];
+              }
+
+              // 3. Duplicate check: if this exact dwell is already in list, update it in place
+              const existingIndex = prev.findIndex((item) => (item.dwellIndex || item.id) === curIdx);
+              if (existingIndex !== -1) {
+                const updated = [...prev];
+                updated[existingIndex] = obsItem;
+                return updated;
+              }
+
+              // 4. If incoming dwell index is <= lastIdx (time went backwards or restarted partway):
+              // truncate any orphaned future dwells and append cleanly
+              if (curIdx <= lastIdx) {
+                const truncated = prev.filter((item) => (item.dwellIndex || item.id) < curIdx);
+                return [...truncated, obsItem];
+              }
+
+              // 5. Gap / jump forward: append cleanly
+              return [...prev, obsItem];
+            });
           }
           if (snapshot.dwellIndex) {
+            latestDwellIndexRef.current = snapshot.dwellIndex;
             setScrubberTimeMs(Number((snapshot.dwellIndex * DWELL_DURATION_MS).toFixed(1)));
           }
         }
@@ -283,14 +325,15 @@ export default function App() {
         batchSize: 20,
         intervalMs: isSlowReplay ? 750 : 250,
         startIndex: streamStartIndex,
-        autoStart: true,
+        getStartIndex: () => latestDwellIndexRef.current || streamStartIndex || 0,
+        autoStart: isScanning,
       }
     );
 
     return () => {
       unsubscribe();
     };
-  }, [isScanning, isSlowReplay, streamStartIndex, totalDwells]);
+  }, [isWsSessionActive, isSlowReplay, streamStartIndex, totalDwells]);
 
   const showToast = (msg) => {
     setToastMessage(msg);
@@ -320,6 +363,7 @@ export default function App() {
       hasLiveCompletedRef.current = false;
       setIsSimulationComplete(false);
       setIsSlowReplay(false);
+      latestDwellIndexRef.current = 0;
       setStreamStartIndex(0);
       setScrubberTimeMs(0.5);
       setRealTimeSeconds(0);
@@ -336,15 +380,26 @@ export default function App() {
       showToast('Please upload a dataset (.h5) from the top-right header to start scanning.');
       return;
     }
+    if (!isSlowReplay) {
+      return; // Pausing dataset is disabled in live mode
+    }
     const nextState = !isScanning;
     setIsScanning(nextState);
-    sendTelemetryCommand({ command: nextState ? 'resume' : 'pause' });
+    const curDwell = latestDwellIndexRef.current || Math.round(scrubberTimeMs / DWELL_DURATION_MS) || 0;
+    const sent = sendTelemetryCommand({
+      command: nextState ? 'resume' : 'pause',
+      dwell_index: curDwell,
+    });
+    if (!sent && nextState) {
+      setStreamStartIndex(curDwell);
+    }
     showToast(nextState ? 'Simulation resumed.' : 'Simulation paused.');
   };
 
   const handleReplaySimulation = () => {
     setObservations([]);
     setIsSimulationComplete(false);
+    latestDwellIndexRef.current = 0;
     setStreamStartIndex(0);
     setScrubberTimeMs(0.5);
     setRealTimeSeconds(0);
@@ -357,6 +412,7 @@ export default function App() {
     setIsSlowReplay(true);
     setObservations([]);
     setIsSimulationComplete(false);
+    latestDwellIndexRef.current = 0;
     setStreamStartIndex(0);
     setScrubberTimeMs(0.5);
     setRealTimeSeconds(0);
@@ -476,6 +532,7 @@ export default function App() {
       setIsSimulationComplete(false);
     }
 
+    latestDwellIndexRef.current = targetDwell;
     setStreamStartIndex(targetDwell);
   };
 
@@ -518,6 +575,7 @@ export default function App() {
     setIsSlowReplay(false);
     completedLiveStateRef.current = null;
     hasLiveCompletedRef.current = false;
+    latestDwellIndexRef.current = 0;
     setStreamStartIndex(0);
     setScrubberTimeMs(0.5);
     setObservations([]);
@@ -571,28 +629,28 @@ export default function App() {
       />
 
       {/* Main Content Area */}
-      <main className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-1 flex flex-col gap-5">
+      <main className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 flex-1 flex flex-col gap-8">
         {/* Simulation Control & Dataset Bar */}
         {!loadedDataset ? (
-          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-white border border-slate-200 shadow-[0_2px_8px_rgba(0,0,0,0.03)] self-start text-[12px] font-medium text-slate-600 select-none">
-            <span className="material-symbols-outlined text-[17px] text-primary">info</span>
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white border border-slate-200 shadow-[0_2px_8px_rgba(0,0,0,0.03)] self-start text-[13px] font-medium text-slate-600 select-none">
+            <span className="material-symbols-outlined text-[18px] text-primary">info</span>
             <span>Upload a dataset <strong className="font-semibold text-slate-800">(.h5)</strong> from the header to begin simulation</span>
           </div>
         ) : (
-          <div className="w-full flex flex-col gap-2 px-3 py-2 rounded-xl bg-white border border-slate-200 shadow-2xs">
+          <div className="w-full flex flex-col gap-3 p-3.5 sm:p-4 rounded-2xl bg-white border border-slate-200 shadow-2xs">
             {/* Top Row: Dataset Info and Action Buttons */}
-            <div className="w-full flex flex-wrap items-center justify-between gap-2">
-              <div className="flex flex-wrap items-center gap-1.5">
+            <div className="w-full flex flex-wrap items-center justify-between gap-3">
+              <div className="flex flex-wrap items-center gap-2">
                 {/* Dataset Badge */}
-                <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-slate-50 border border-slate-200/90 text-slate-700 shadow-2xs">
-                  <span className="material-symbols-outlined text-[14px] text-primary">
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-50 border border-slate-200/90 text-slate-700 shadow-2xs">
+                  <span className="material-symbols-outlined text-[16px] text-primary">
                     folder_open
                   </span>
-                  <span className="font-label-sm text-[9.5px] uppercase text-slate-500 font-semibold tracking-wide">
+                  <span className="font-label-sm text-[11px] uppercase text-slate-500 font-medium tracking-wide">
                     Dataset:
                   </span>
                   <span
-                    className="font-mono text-[10.5px] font-bold text-slate-900 truncate max-w-[150px] sm:max-w-xs"
+                    className="font-mono text-[12px] font-semibold text-slate-900 truncate max-w-[150px] sm:max-w-xs"
                     title={loadedDataset.name}
                   >
                     {loadedDataset.name}
@@ -600,80 +658,56 @@ export default function App() {
                 </div>
 
                 {/* Band Bins Configuration Pill */}
-                <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-slate-50 border border-slate-200/90 text-slate-600 select-none shadow-2xs">
-                  <span className="material-symbols-outlined text-[12px] text-primary">view_column</span>
-                  <span className="font-label-sm text-[9.5px] uppercase text-slate-500 font-semibold tracking-wide">
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-50 border border-slate-200/90 text-slate-600 select-none shadow-2xs">
+                  <span className="material-symbols-outlined text-[16px] text-primary">view_column</span>
+                  <span className="font-label-sm text-[11px] uppercase text-slate-500 font-medium tracking-wide">
                     Band Bins:
                   </span>
-                  <span className="font-mono text-[10px] font-bold text-slate-800">
+                  <span className="font-mono text-[12px] font-semibold text-slate-800">
                     20 Channels (875 MHz)
                   </span>
                 </div>
 
                 {/* Live Real Time Stopwatch Pill (hidden in Slow Replay Mode) */}
                 {!isSlowReplay && (
-                  <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-slate-50 border border-slate-200/90 text-slate-600 select-none shadow-2xs">
-                    <span className={`material-symbols-outlined text-[12px] text-primary ${isScanning ? 'animate-pulse' : ''}`}>
+                  <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-50 border border-slate-200/90 text-slate-600 select-none shadow-2xs">
+                    <span className={`material-symbols-outlined text-[16px] text-primary ${isScanning ? 'animate-pulse' : ''}`}>
                       timer
                     </span>
-                    <span className="font-label-sm text-[9.5px] uppercase text-slate-500 font-semibold tracking-wide">
+                    <span className="font-label-sm text-[11px] uppercase text-slate-500 font-medium tracking-wide">
                       Real Time:
                     </span>
-                    <span className="font-mono text-[10.5px] font-bold text-slate-800">
+                    <span className="font-mono text-[12px] font-semibold text-slate-800">
                       {realTimeSeconds.toFixed(1)}s
                     </span>
                   </div>
                 )}
 
                 {/* RF Simulation Time Window Pill */}
-                <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-slate-50 border border-slate-200/90 text-slate-600 select-none shadow-2xs">
-                  <span className="material-symbols-outlined text-[12px] text-primary">schedule</span>
-                  <span className="font-label-sm text-[9.5px] uppercase text-slate-500 font-semibold tracking-wide">
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-50 border border-slate-200/90 text-slate-600 select-none shadow-2xs">
+                  <span className="material-symbols-outlined text-[16px] text-primary">schedule</span>
+                  <span className="font-label-sm text-[11px] uppercase text-slate-500 font-medium tracking-wide">
                     RF Sim:
                   </span>
-                  <span className="font-mono text-[10px] font-bold text-slate-800">
+                  <span className="font-mono text-[12px] font-semibold text-slate-800">
                     {scrubberTimeMs.toFixed(1)} ms
                   </span>
                 </div>
               </div>
 
-              {/* Action Buttons: Play/Pause/Replay, Slow Replay, Remove (Micro compact size) */}
-              <div className="flex flex-wrap items-center gap-1">
-                {/* When in high-speed mode */}
-                {!isSlowReplay && (
-                  <>
-                    {/* While running / paused before complete */}
-                    {!isSimulationComplete ? (
-                      <button
-                        onClick={handleTogglePause}
-                        type="button"
-                        className={`flex items-center gap-1 px-1.5 py-0.5 rounded-md font-label-md text-[9.5px] font-medium transition-colors select-none cursor-pointer shadow-2xs ${
-                          isScanning
-                            ? 'bg-slate-50 hover:bg-amber-50 text-slate-700 hover:text-amber-800 border border-slate-200 hover:border-amber-300'
-                            : 'bg-slate-50 hover:bg-emerald-50 text-slate-700 hover:text-emerald-800 border border-slate-200 hover:border-emerald-300'
-                        }`}
-                        title={isScanning ? 'Pause the ongoing simulation' : 'Resume scanning simulation'}
-                      >
-                        <span className="material-symbols-outlined text-[12px]">
-                          {isScanning ? 'pause' : 'play_arrow'}
-                        </span>
-                        <span>{isScanning ? 'Pause' : 'Resume'}</span>
-                      </button>
-                    ) : (
-                      <>
-                        {/* Slow Replay button: Visible after live simulation mode has completed */}
-                        <button
-                          onClick={handleSwitchToSlowReplay}
-                          type="button"
-                          className="flex items-center gap-1 px-2 py-0.5 rounded-md font-label-md text-[9.5px] font-semibold bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 hover:border-indigo-300 transition-colors select-none cursor-pointer shadow-2xs"
-                          title="Replay decision-by-decision at a slower speed with circular radar scans"
-                        >
-                          <span className="material-symbols-outlined text-[13px] text-indigo-600">slow_motion_video</span>
-                          <span>Slow Replay</span>
-                        </button>
-                      </>
-                    )}
-                  </>
+              {/* Action Buttons: Play/Pause/Replay, Slow Replay, Remove */}
+              <div className="flex flex-wrap items-center gap-2">
+                {/* When in live mode: pause is disabled; show Slow Replay once simulation completes */}
+                {!isSlowReplay && isSimulationComplete && (
+                  <button
+                    onClick={handleSwitchToSlowReplay}
+                    type="button"
+                    className="group flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-label-md text-[12px] sm:text-[13px] font-medium bg-white hover:bg-primary/5 text-primary border border-slate-200 hover:border-primary/40 transition-colors select-none cursor-pointer shadow-2xs"
+                    title="Replay decision-by-decision at a slower speed with circular radar scans"
+                  >
+                    <span className="material-symbols-outlined text-[16px] text-primary anim-slow-motion-hover">slow_motion_video</span>
+                    <span>Slow Replay</span>
+                  </button>
                 )}
 
                 {/* When in slower speed mode */}
@@ -683,24 +717,24 @@ export default function App() {
                       <button
                         onClick={handleReplaySimulation}
                         type="button"
-                        className="flex items-center gap-1 px-1.5 py-0.5 rounded-md font-label-md text-[9.5px] font-medium bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 transition-colors select-none cursor-pointer shadow-2xs"
+                        className="group flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-label-md text-[12px] sm:text-[13px] font-medium bg-white hover:bg-slate-50 text-slate-700 hover:text-slate-900 border border-slate-200 hover:border-slate-300 transition-colors select-none cursor-pointer shadow-2xs"
                         title="Replay from 0.0 ms"
                       >
-                        <span className="material-symbols-outlined text-[12px]">replay</span>
+                        <span className="material-symbols-outlined text-[15px] text-slate-600 anim-replay-hover">replay</span>
                         <span>Replay</span>
                       </button>
                     ) : (
                       <button
                         onClick={handleTogglePause}
                         type="button"
-                        className={`flex items-center gap-1 px-1.5 py-0.5 rounded-md font-label-md text-[9.5px] font-medium transition-colors select-none cursor-pointer shadow-2xs ${
+                        className={`group flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-label-md text-[12px] sm:text-[13px] font-medium transition-colors select-none cursor-pointer shadow-2xs ${
                           isScanning
                             ? 'bg-slate-50 hover:bg-amber-50 text-slate-700 hover:text-amber-800 border border-slate-200 hover:border-amber-300'
                             : 'bg-slate-50 hover:bg-emerald-50 text-slate-700 hover:text-emerald-800 border border-slate-200 hover:border-emerald-300'
                         }`}
                         title={isScanning ? 'Pause the ongoing simulation' : 'Resume scanning simulation'}
                       >
-                        <span className="material-symbols-outlined text-[12px]">
+                        <span className="material-symbols-outlined text-[15px] anim-play-pause-hover">
                           {isScanning ? 'pause' : 'play_arrow'}
                         </span>
                         <span>{isScanning ? 'Pause' : 'Resume'}</span>
@@ -711,10 +745,10 @@ export default function App() {
                     <button
                       onClick={handleSwitchToHighSpeed}
                       type="button"
-                      className="flex items-center gap-1 px-2 py-0.5 rounded-md font-label-md text-[9.5px] font-semibold bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 hover:border-emerald-400 transition-colors select-none cursor-pointer shadow-2xs"
+                      className="group flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-label-md text-[12px] sm:text-[13px] font-medium bg-white hover:bg-slate-50 text-slate-700 hover:text-primary border border-slate-200 hover:border-primary/30 transition-colors select-none cursor-pointer shadow-2xs"
                       title="Switch back to high-speed batch streaming mode"
                     >
-                      <span className="material-symbols-outlined text-[13px] text-emerald-600">bolt</span>
+                      <span className="material-symbols-outlined text-[16px] text-slate-500 group-hover:text-primary anim-bolt-hover transition-colors">bolt</span>
                       <span>Switch to Live Mode</span>
                     </button>
                   </>
@@ -724,11 +758,11 @@ export default function App() {
                 <button
                   onClick={handleClearSimulation}
                   type="button"
-                  className="flex items-center gap-1 px-1.5 py-0.5 rounded-md font-label-md text-[9.5px] font-medium text-slate-600 hover:text-rose-700 bg-slate-50 hover:bg-rose-50 border border-slate-200 hover:border-rose-200 transition-colors cursor-pointer select-none shadow-2xs"
+                  className="group flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-label-md text-[12px] sm:text-[13px] font-medium text-slate-600 hover:text-rose-700 bg-slate-50 hover:bg-rose-50 border border-slate-200 hover:border-rose-200 transition-colors cursor-pointer select-none shadow-2xs"
                   title="Remove dataset and return to default state"
                   id="btn-remove-dataset"
                 >
-                  <span className="material-symbols-outlined text-[12px]">delete_outline</span>
+                  <span className="material-symbols-outlined text-[15px] anim-trash-hover">delete_outline</span>
                   <span>Remove Dataset</span>
                 </button>
               </div>
@@ -736,13 +770,13 @@ export default function App() {
 
             {/* Bottom Row: Simulation Timeline Slider (Shown ONLY in slower speed mode) */}
             {isSlowReplay && (
-              <div className="w-full pt-2.5 border-t border-slate-100 flex flex-col gap-1.5 text-xs">
+              <div className="group/timeline w-full pt-3 border-t border-slate-100 flex flex-col gap-2 text-[12px]">
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1.5 font-semibold text-slate-700 text-[11px] uppercase tracking-wide">
-                    <span className="material-symbols-outlined text-[15px] text-primary">timeline</span>
+                  <div className="flex items-center gap-2 font-semibold text-slate-700 text-[12px] uppercase tracking-wide">
+                    <span className="material-symbols-outlined text-[16px] text-primary anim-timeline-hover">timeline</span>
                     <span>Simulation Timeline</span>
                   </div>
-                  <span className="font-mono text-[11.5px] font-bold text-primary bg-primary/10 px-2.5 py-0.5 rounded-md border border-primary/20">
+                  <span className="font-mono text-[12px] font-semibold text-primary bg-primary/10 px-2.5 py-0.5 rounded-md border border-primary/20">
                     {scrubberTimeMs.toFixed(1)} ms / {(totalDwells * DWELL_DURATION_MS).toFixed(1)} ms
                   </span>
                 </div>
@@ -754,7 +788,10 @@ export default function App() {
                     step="0.5"
                     value={scrubberTimeMs}
                     onChange={(e) => handleScrubberChange(e.target.value)}
-                    className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-primary focus:outline-hidden"
+                    style={{
+                      background: `linear-gradient(to right, #006972 0%, #008996 ${Math.min(100, Math.max(0, (scrubberTimeMs / ((totalDwells * DWELL_DURATION_MS) || 1)) * 100)).toFixed(1)}%, #e2e8f0 ${Math.min(100, Math.max(0, (scrubberTimeMs / ((totalDwells * DWELL_DURATION_MS) || 1)) * 100)).toFixed(1)}%, #e2e8f0 100%)`
+                    }}
+                    className="timeline-slider w-full h-2 hover:h-2.5 bg-slate-200 rounded-lg appearance-none cursor-pointer focus:outline-hidden transition-all duration-200"
                     title="Drag slider to inspect timeline and play from that timestamp"
                   />
                 </div>
@@ -801,7 +838,7 @@ export default function App() {
         </div>
 
         {/* Bottom Section: Observations Graph/Table & RL Parameters Accordion with Live Average Reward */}
-        <div className="flex flex-col gap-6">
+        <div className="flex flex-col gap-8">
           {loadedDataset && (
             <ObservationsSection
               observations={observations}

@@ -636,7 +636,7 @@ export default function ObservationsSection({
       const curr = pts[i];
       if (prev.y !== curr.y) {
         verticalLines.push({
-          id: `vl-${curr.obs.id || i}`,
+          id: `vl-${curr.obs.id || i}-${i}`,
           x: curr.startX,
           y1: prev.y,
           y2: curr.y,
@@ -657,26 +657,26 @@ export default function ObservationsSection({
     <div className="bg-white rounded-2xl shadow-[0_2px_10px_rgba(0,0,0,0.04)] border border-slate-200 p-5 sm:p-6 flex flex-col">
       {/* Header bar */}
       <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-slate-100 relative z-30">
-        <div className="flex flex-col gap-0.5">
+        <div className="flex flex-col gap-1">
           <div className="flex items-center gap-2">
             <BandStepGraphIcon className="w-[20px] h-[20px] text-primary" />
-            <h3 className="font-label-md text-label-md font-semibold text-on-surface uppercase tracking-wide">
+            <h3 className="text-[18px] font-semibold text-on-surface tracking-tight">
               Band vs. Time Observations
             </h3>
           </div>
-          <p className="font-body-sm text-[11px] text-slate-500 font-normal pl-7">
+          <p className="text-[13px] text-slate-500 font-normal pl-7 leading-[20px]">
             Adaptive ML scan timeline
           </p>
         </div>
 
-        <div className="flex items-center gap-2.5 sm:gap-3 flex-wrap">
+        <div className="flex items-center gap-3 flex-wrap">
           {/* Jump to Previous Interception Button (Only in Graph View) */}
           {displayMode === 'graph' && (
             <button
               type="button"
               onClick={handleJumpToPreviousInterception}
               disabled={!isInteractive || isJumpingToHit || observations.length === 0}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white border border-slate-200 hover:border-emerald-400 hover:bg-emerald-50/60 text-slate-700 hover:text-emerald-900 font-label-md text-[11.5px] font-semibold transition-all cursor-pointer shadow-2xs disabled:opacity-40 disabled:cursor-not-allowed"
+              className="group flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white border border-slate-200 hover:border-emerald-400 hover:bg-emerald-50/60 text-slate-700 hover:text-emerald-900 font-label-md text-[13px] sm:text-[14px] font-medium transition-all cursor-pointer shadow-2xs disabled:opacity-40 disabled:cursor-not-allowed"
               title={!isInteractive ? "Available after live simulation completes or in replay mode" : "Step backward to earlier RF interceptions in timeline"}
               id="btn-jump-prev-hit"
             >
@@ -685,7 +685,7 @@ export default function ObservationsSection({
                   progress_activity
                 </span>
               ) : (
-                <span className="material-symbols-outlined text-[15px] text-emerald-600">
+                <span className="material-symbols-outlined text-[15px] text-emerald-600 anim-prev-hit-hover">
                   skip_previous
                 </span>
               )}
@@ -696,14 +696,14 @@ export default function ObservationsSection({
           {/* View Switcher Pill Dropdown (Graph View vs Tabular View) */}
           <div className="relative inline-block">
             <button
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white border border-slate-200 shadow-2xs text-primary font-label-md text-[11.5px] font-semibold hover:border-primary/50 transition-all cursor-pointer"
+              className="group flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white border border-slate-200 shadow-2xs text-primary font-label-md text-[13px] sm:text-[14px] font-medium hover:border-primary/50 transition-all cursor-pointer"
               id="view-graph-btn"
               type="button"
               onClick={() => {
                 setIsViewDropdownOpen((prev) => !prev);
               }}
             >
-              <span className="material-symbols-outlined text-[16px] text-primary" id="graph-view-icon">
+              <span className={`material-symbols-outlined text-[16px] text-primary ${displayMode === 'graph' ? 'anim-graph-hover' : 'anim-table-hover'}`} id="graph-view-icon">
                 {displayMode === 'graph' ? 'show_chart' : 'table_chart'}
               </span>
               <span id="current-graph-view-label">
@@ -715,12 +715,12 @@ export default function ObservationsSection({
             </button>
 
             {isViewDropdownOpen && (
-              <div className="absolute right-0 top-full mt-1.5 w-36 bg-white border border-slate-200 rounded-xl shadow-[0_4px_16px_rgba(0,0,0,0.08)] p-1 z-50 animate-in fade-in slide-in-from-top-1 duration-150">
+              <div className="absolute right-0 top-full mt-2 w-36 bg-white border border-slate-200 rounded-xl shadow-[0_4px_16px_rgba(0,0,0,0.08)] p-1.5 z-50 animate-in fade-in slide-in-from-top-1 duration-150">
                 <button
-                  className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg font-label-md text-[11.5px] text-left transition-colors cursor-pointer ${
+                  className={`group/opt w-full flex items-center justify-between px-3 py-2 rounded-lg font-label-md text-[13px] text-left transition-colors cursor-pointer ${
                     displayMode === 'graph'
                       ? 'bg-slate-50 text-primary font-semibold'
-                      : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                      : 'text-slate-600 font-medium hover:bg-slate-50 hover:text-slate-900'
                   }`}
                   onClick={() => {
                     setDisplayMode('graph');
@@ -728,16 +728,19 @@ export default function ObservationsSection({
                   }}
                   type="button"
                 >
-                  <span>Graph View</span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="material-symbols-outlined text-[15px] text-primary anim-graph-hover">show_chart</span>
+                    <span>Graph View</span>
+                  </div>
                   {displayMode === 'graph' && (
                     <span className="material-symbols-outlined text-[14px]">check</span>
                   )}
                 </button>
                 <button
-                  className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg font-label-md text-[11.5px] text-left transition-colors cursor-pointer ${
+                  className={`group/opt w-full flex items-center justify-between px-3 py-2 rounded-lg font-label-md text-[13px] text-left transition-colors cursor-pointer ${
                     displayMode === 'table'
                       ? 'bg-slate-50 text-primary font-semibold'
-                      : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                      : 'text-slate-600 font-medium hover:bg-slate-50 hover:text-slate-900'
                   }`}
                   onClick={() => {
                     setDisplayMode('table');
@@ -745,7 +748,10 @@ export default function ObservationsSection({
                   }}
                   type="button"
                 >
-                  <span>Tabular View</span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="material-symbols-outlined text-[15px] text-primary anim-table-hover">table_chart</span>
+                    <span>Tabular View</span>
+                  </div>
                   {displayMode === 'table' && (
                     <span className="material-symbols-outlined text-[14px]">check</span>
                   )}
@@ -757,7 +763,7 @@ export default function ObservationsSection({
           {/* Export CSV Button with Loading State and Hover Tooltip */}
           <div className="relative group">
             <button
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-50 text-slate-700 hover:text-slate-900 font-label-sm text-[11.5px] font-medium border border-slate-200 hover:bg-slate-100 transition-colors cursor-pointer shadow-2xs disabled:opacity-40 disabled:cursor-not-allowed"
+              className="group flex items-center gap-2 px-3.5 py-2 rounded-xl bg-slate-50 text-slate-700 hover:text-slate-900 font-label-md text-[13px] sm:text-[14px] font-semibold border border-slate-200 hover:bg-slate-100 transition-colors cursor-pointer shadow-2xs disabled:opacity-40 disabled:cursor-not-allowed"
               onClick={handleExportCSV}
               type="button"
               disabled={!isCompleted || isExporting}
@@ -768,13 +774,13 @@ export default function ObservationsSection({
                   progress_activity
                 </span>
               ) : (
-                <span className="material-symbols-outlined text-[15px] text-primary">download</span>
+                <span className="material-symbols-outlined text-[15px] text-primary anim-download-hover">download</span>
               )}
               <span>{isExporting ? 'Exporting All...' : 'Export CSV'}</span>
             </button>
             {/* Hover Tooltip explaining full data download */}
             <div className="absolute right-0 top-full mt-1.5 hidden group-hover:flex flex-col items-end z-50 pointer-events-none">
-              <div className="px-2.5 py-1 rounded-md bg-slate-900/95 text-white text-[10px] font-medium tracking-wide shadow-md whitespace-nowrap">
+              <div className="px-2.5 py-1 rounded-md bg-slate-900/95 text-white text-[11px] font-medium tracking-wide shadow-md whitespace-nowrap">
                 {!isCompleted
                   ? 'Available after simulation completes'
                   : displayMode === 'table' && tableShowInterceptedOnly
@@ -824,7 +830,7 @@ export default function ObservationsSection({
                       y={getY(b)}
                       dominantBaseline="central"
                       textAnchor="end"
-                      className="text-[10px] font-mono fill-slate-500 font-medium"
+                      className="text-[11px] font-mono fill-slate-500 font-medium"
                     >
                       {`Band ${b}`}
                     </text>
@@ -919,10 +925,10 @@ export default function ObservationsSection({
                   const isHighlighted = (pt.obs.dwellIndex || pt.obs.id) === highlightedHitDwellId;
 
                   return (
-                    <g key={`dwell-group-${pt.obs.id || idx}`}>
+                    <g key={`dwell-group-${pt.obs.id || idx}-${idx}`}>
                       {/* Pulsing Beacon & Badge if this is the jumped-to hit */}
                       {isHighlighted && (
-                        <g key={`hit-beacon-${pt.obs.id || idx}`} className="pointer-events-none">
+                        <g key={`hit-beacon-${pt.obs.id || idx}-${idx}`} className="pointer-events-none">
                           <line
                             x1={pt.midX}
                             y1="22"
@@ -948,10 +954,10 @@ export default function ObservationsSection({
 
                           <g transform={`translate(${pt.midX}, ${Math.max(22, pt.y - 18)})`}>
                             <rect
-                              x="-33"
-                              y="-13"
-                              width={66}
-                              height="15"
+                              x="-38"
+                              y="-14"
+                              width={76}
+                              height="17"
                               rx="4"
                               fill="#064E3B"
                               stroke="#34D399"
@@ -963,7 +969,7 @@ export default function ObservationsSection({
                               y="-2"
                               textAnchor="middle"
                               fill="#A7F3D0"
-                              className="text-[9px] font-sans font-bold uppercase tracking-wider select-none"
+                              className="text-[11px] font-sans font-semibold uppercase tracking-wider select-none"
                             >
                               Previous Hit
                             </text>
@@ -1068,7 +1074,7 @@ export default function ObservationsSection({
                                 fill="#10B981"
                                 stroke="#FFFFFF"
                                 strokeWidth="1.2"
-                                className="drop-shadow-[0_0_6px_rgba(16,185,129,0.9)] pointer-events-none"
+                                className="pointer-events-none"
                               />
                             ) : (
                               <polygon
@@ -1145,7 +1151,7 @@ export default function ObservationsSection({
                         const labelStr = `${timeMs.toFixed(1)} ms`;
 
                         return (
-                          <g key={`x-tick-${pt.obs.id || idx}`}>
+                          <g key={`x-tick-${pt.obs.id || idx}-${idx}`}>
                             <line
                               x1={pt.endX}
                               y1="205"
@@ -1159,7 +1165,7 @@ export default function ObservationsSection({
                                 x={pt.endX}
                                 y="222"
                                 textAnchor="middle"
-                                className="text-[10px] font-mono fill-slate-500 font-semibold select-none"
+                                className="text-[11px] font-mono fill-slate-500 font-medium select-none"
                               >
                                 {labelStr}
                               </text>
@@ -1175,7 +1181,7 @@ export default function ObservationsSection({
               {/* Clean Minimal Hover Tooltip: Shows ONLY the frequency */}
               {hoverInfo && !isDownRef.current && (
                 <div
-                  className="absolute pointer-events-none select-none z-30 shadow-md rounded-lg bg-slate-900/95 text-emerald-400 border border-slate-700/80 px-2.5 py-1 backdrop-blur-xs font-mono text-[12px] font-bold tracking-wide whitespace-nowrap"
+                  className="absolute pointer-events-none select-none z-30 shadow-md rounded-lg bg-slate-900/95 text-emerald-400 border border-slate-700/80 px-2.5 py-1 backdrop-blur-xs font-mono text-[13px] font-semibold tracking-wide whitespace-nowrap"
                   style={{
                     left: `${Math.min(plotWidth - 55, Math.max(55, hoverInfo.x))}px`,
                     top: hoverInfo.y < 45 ? `${hoverInfo.y + 12}px` : `${hoverInfo.y - 32}px`,
@@ -1190,44 +1196,44 @@ export default function ObservationsSection({
               {graphDwells.length === 0 && (
                 <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-400 gap-1.5 select-none pointer-events-none">
                   <BandStepGraphIcon className="w-6 h-6 text-slate-300" />
-                  <span className="text-[12px] font-medium">Awaiting scan steps to plot timeline...</span>
+                  <span className="text-[13px] font-medium">Awaiting scan steps to plot timeline...</span>
                 </div>
               )}
             </div>
           </div>
 
           {/* Graph Footer Bar */}
-          <div className="flex flex-wrap items-center justify-between gap-2.5 pt-3 border-t border-slate-100 mt-2 text-[11px] text-slate-500 select-none">
+          <div className="flex flex-wrap items-center justify-between gap-2.5 pt-3 border-t border-slate-100 mt-2 text-[12px] text-slate-500 select-none">
             <div className="flex items-center gap-1.5">
-              <span className="material-symbols-outlined text-[13px] text-primary">touch_app</span>
+              <span className="material-symbols-outlined text-[14px] text-primary">touch_app</span>
               <span>
                 Hover over intercepted dwells or emissions to inspect exact frequency. Drag or scroll backwards to view earlier history.
               </span>
             </div>
 
             {/* Dynamic Visual Legend reflecting current filter and viewMode */}
-            <div className="flex flex-wrap items-center gap-4">
+            <div className="flex flex-wrap items-center gap-4 text-[12px]">
               {showInterceptions && (
                 <div className="flex items-center gap-1.5">
                   <span className="w-4 h-1 rounded bg-[#10B981]" />
-                  <span className="text-emerald-700 font-bold">HIT</span>
+                  <span className="text-emerald-700 font-semibold">HIT</span>
                 </div>
               )}
               {showMisses && viewMode === 'receiver' && (
                 <div className="flex items-center gap-1.5">
                   <span className="w-4 h-1 rounded bg-[#F59E0B]" />
-                  <span className="text-amber-700 font-medium">Scan Miss <span className="text-[10px] font-normal text-amber-600">(scan miss or quiet miss)</span></span>
+                  <span className="text-amber-700 font-medium">Scan Miss <span className="text-[11px] font-normal text-slate-500">(scan miss or quiet miss)</span></span>
                 </div>
               )}
               {showMisses && viewMode === 'environment' && (
                 <>
                   <div className="flex items-center gap-1.5">
                     <span className="w-4 h-1 rounded bg-[#F59E0B]" />
-                    <span className="text-amber-700 font-medium">Scan Miss <span className="text-[10px] font-normal text-amber-600">(active emission)</span></span>
+                    <span className="text-amber-700 font-medium">Scan Miss <span className="text-[11px] font-normal text-slate-500">(active emission)</span></span>
                   </div>
                   <div className="flex items-center gap-1.5">
                     <span className="w-4 h-1 rounded bg-[#94A3B8]" />
-                    <span className="text-slate-500 font-medium">Quiet Miss <span className="text-[10px] font-normal text-slate-400">(no emission)</span></span>
+                    <span className="text-slate-600 font-medium">Quiet Miss <span className="text-[11px] font-normal text-slate-500">(no emission)</span></span>
                   </div>
                 </>
               )}
@@ -1235,7 +1241,7 @@ export default function ObservationsSection({
                 <>
                   <div className="flex items-center gap-1.5">
                     <span className="w-2.5 h-2.5 rotate-45 bg-[#10B981] border border-white shadow-2xs" />
-                    <span className="text-emerald-800 font-bold">Detected Emission</span>
+                    <span className="text-emerald-800 font-semibold">Detected Emission</span>
                   </div>
                   <div className="flex items-center gap-1.5">
                     <span className="w-2.5 h-2.5 rotate-45 bg-slate-300 border border-slate-500 shadow-2xs" />
@@ -1266,12 +1272,12 @@ export default function ObservationsSection({
             </button>
           )}
           {/* Subtitle note on table with Intercepted Only toggle */}
-          <div className="pb-2 text-[11px] text-slate-500 flex flex-wrap items-center justify-between gap-2">
-            <span className="font-mono font-semibold text-slate-700 text-xs">
+          <div className="pb-3 text-[12px] text-slate-500 flex flex-wrap items-center justify-between gap-3">
+            <span className="font-mono font-semibold text-slate-700 text-[12px]">
               {filteredTableRows.length} / {totalDwells || observations.length}
             </span>
-            <div className="flex items-center gap-2.5">
-              <span className="font-mono text-[10px] text-slate-400 hidden sm:inline">
+            <div className="flex items-center gap-3">
+              <span className="font-mono text-[11px] text-slate-400 hidden sm:inline">
                 {isInteractive ? 'Scroll down or use button to load earlier' : 'Live stream active'}
               </span>
               <button
@@ -1280,14 +1286,14 @@ export default function ObservationsSection({
                   setTableShowInterceptedOnly((prev) => !prev);
                   setTableVisibleCount(CHUNK_SIZE);
                 }}
-                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer shadow-2xs border ${
+                className={`group flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-medium transition-all cursor-pointer shadow-2xs border ${
                   tableShowInterceptedOnly
                     ? 'bg-emerald-50 text-emerald-800 border-emerald-300 ring-1 ring-emerald-300'
                     : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50 hover:text-slate-900'
                 }`}
                 title="Toggle between showing only intercepted dwells (hits) and all dwells"
               >
-                <span className={`material-symbols-outlined text-[15px] ${tableShowInterceptedOnly ? 'text-emerald-600' : 'text-slate-400'}`}>
+                <span className={`material-symbols-outlined text-[15px] anim-check-hover ${tableShowInterceptedOnly ? 'text-emerald-600' : 'text-slate-400'}`}>
                   {tableShowInterceptedOnly ? 'check_circle' : 'radio_button_unchecked'}
                 </span>
                 <span>Intercepted Only</span>
@@ -1305,34 +1311,34 @@ export default function ObservationsSection({
             }}
             onScroll={handleTableScroll}
           >
-            <table className="w-full text-left text-xs font-label-sm border-collapse min-w-[620px]">
+            <table className="w-full text-left border-collapse min-w-[620px]">
               <thead className="bg-slate-50 border-b border-slate-200 sticky top-0 z-10 shadow-2xs">
                 <tr>
-                  <th className="py-2.5 px-3.5 text-slate-600 font-bold uppercase tracking-wider text-[10.5px] whitespace-nowrap">Time Window</th>
-                  <th className="py-2.5 px-3.5 text-slate-600 font-bold uppercase tracking-wider text-[10.5px] whitespace-nowrap">Selected Band</th>
-                  <th className="py-2.5 px-3.5 text-slate-600 font-bold uppercase tracking-wider text-[10.5px] whitespace-nowrap">Intercepted Frequency</th>
-                  <th className="py-2.5 px-3.5 text-slate-600 font-bold uppercase tracking-wider text-[10.5px] whitespace-nowrap">Result</th>
-                  <th className="py-2.5 px-3.5 text-slate-600 font-bold uppercase tracking-wider text-[10.5px] whitespace-nowrap">Reward</th>
-                  <th className="py-2.5 px-3.5 text-slate-600 font-bold uppercase tracking-wider text-[10.5px] whitespace-nowrap">Pulses Detected</th>
+                  <th className="py-2.5 px-3.5 text-slate-600 font-medium uppercase tracking-wider text-[12px] whitespace-nowrap">Time Window</th>
+                  <th className="py-2.5 px-3.5 text-slate-600 font-medium uppercase tracking-wider text-[12px] whitespace-nowrap">Selected Band</th>
+                  <th className="py-2.5 px-3.5 text-slate-600 font-medium uppercase tracking-wider text-[12px] whitespace-nowrap">Intercepted Frequency</th>
+                  <th className="py-2.5 px-3.5 text-slate-600 font-medium uppercase tracking-wider text-[12px] whitespace-nowrap">Result</th>
+                  <th className="py-2.5 px-3.5 text-slate-600 font-medium uppercase tracking-wider text-[12px] whitespace-nowrap">Reward</th>
+                  <th className="py-2.5 px-3.5 text-slate-600 font-medium uppercase tracking-wider text-[12px] whitespace-nowrap">Pulses Detected</th>
                   {viewMode === 'environment' && (
-                    <th className="py-2.5 px-3.5 text-emerald-800 font-bold uppercase tracking-wider text-[10.5px] whitespace-nowrap">Active Emissions in Window (Exact Freq)</th>
+                    <th className="py-2.5 px-3.5 text-slate-600 font-medium uppercase tracking-wider text-[12px] whitespace-nowrap">Active Emissions in Window (Exact Freq)</th>
                   )}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 text-on-surface font-mono text-[11px]">
+              <tbody className="divide-y divide-slate-100 text-on-surface text-[12px]">
                 {filteredTableRows.length > 0 ? (
                   filteredTableRows.map((row) => (
                     <tr key={row.id} className="hover:bg-slate-50/80 transition-colors">
-                      <td className="py-2.5 px-3.5 font-bold text-slate-900 whitespace-nowrap">{row.timeWindow || row.timestamp}</td>
+                      <td className="py-2.5 px-3.5 font-medium text-slate-900 whitespace-nowrap font-mono text-[12px]">{row.timeWindow || row.timestamp}</td>
                       <td className="py-2.5 px-3.5 whitespace-nowrap">
                         <div className="flex items-center gap-1.5">
-                          <span className="font-semibold text-primary">{row.band}</span>
-                          <span className="text-slate-400 font-mono text-[10px]">({row.range})</span>
+                          <span className="font-semibold text-primary font-sans text-[12px]">{row.band}</span>
+                          <span className="text-slate-500 font-mono text-[11px]">({row.range})</span>
                         </div>
                       </td>
-                      <td className="py-2.5 px-3.5 whitespace-nowrap font-mono text-[11px]">
+                      <td className="py-2.5 px-3.5 whitespace-nowrap font-mono text-[12px]">
                         {row.isIntercepted ? (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-800 border border-emerald-200 font-bold shadow-2xs whitespace-nowrap">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-800 border border-emerald-200 font-semibold shadow-2xs whitespace-nowrap">
                             {row.interceptedFreq && row.interceptedFreq !== '-' ? row.interceptedFreq : row.centerFreq}
                           </span>
                         ) : (
@@ -1341,26 +1347,26 @@ export default function ObservationsSection({
                       </td>
                       <td className="py-2.5 px-3.5 whitespace-nowrap">
                         {row.isIntercepted ? (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-800 border border-emerald-200 font-bold shadow-2xs">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-800 border border-emerald-200 font-semibold shadow-2xs font-sans text-[11px] tracking-wide">
                             HIT
                           </span>
                         ) : viewMode === 'receiver' ? (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-amber-50 text-amber-700 border border-amber-200 font-medium shadow-2xs" title="Scan Miss: Receiver detected 0 transmissions in this dwell window">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-amber-50 text-amber-700 border border-amber-200 font-semibold shadow-2xs font-sans text-[11px] tracking-wide" title="Scan Miss: Receiver detected 0 transmissions in this dwell window">
                             SCAN MISS
                           </span>
                         ) : (row.hasEmission || (row.actualEmissions && row.actualEmissions.length > 0) || (row.actualBands && row.actualBands.length > 0)) ? (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-amber-50 text-amber-700 border border-amber-200 font-medium shadow-2xs" title="Active emission was present in spectrum but receiver was on a different band">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-amber-50 text-amber-700 border border-amber-200 font-semibold shadow-2xs font-sans text-[11px] tracking-wide" title="Active emission was present in spectrum but receiver was on a different band">
                             SCAN MISS
                           </span>
                         ) : (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-slate-50 text-slate-500 border border-slate-200 font-medium shadow-2xs" title="No emission active — idle dwell window">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-slate-50 text-slate-500 border border-slate-200 font-medium shadow-2xs font-sans text-[11px] tracking-wide" title="No emission active — idle dwell window">
                             QUIET MISS
                           </span>
                         )}
                       </td>
-                      <td className="py-2.5 px-3.5 whitespace-nowrap font-mono text-[11px]">
+                      <td className="py-2.5 px-3.5 whitespace-nowrap font-mono text-[12px]">
                         <span
-                          className={`inline-flex items-center px-2 py-0.5 rounded-md font-bold text-[10.5px] shadow-2xs ${
+                          className={`inline-flex items-center px-2 py-0.5 rounded-md font-semibold text-[12px] shadow-2xs ${
                             (row.reward !== undefined ? Number(row.reward) : (row.isIntercepted ? 0.02 : -0.01)) > 0
                               ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
                               : (row.reward !== undefined ? Number(row.reward) : (row.isIntercepted ? 0.02 : -0.01)) < 0
@@ -1374,7 +1380,7 @@ export default function ObservationsSection({
                           })()}
                         </span>
                       </td>
-                      <td className="py-2.5 px-3.5 whitespace-nowrap font-mono">
+                      <td className="py-2.5 px-3.5 whitespace-nowrap font-mono text-[12px]">
                         <span className="font-semibold text-slate-700">{row.pulsesDetected}</span>
                       </td>
                       {viewMode === 'environment' && (
@@ -1384,21 +1390,21 @@ export default function ObservationsSection({
                               row.actualEmissions.map((em, idx) => (
                                 <span
                                   key={`table-em-${row.id}-${em.bandId}-${idx}`}
-                                  className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono ${
+                                  className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-mono ${
                                     em.isDetected
-                                      ? 'bg-emerald-50 text-emerald-800 border border-emerald-200 font-bold'
+                                      ? 'bg-emerald-50 text-emerald-800 border border-emerald-200 font-semibold'
                                       : 'bg-slate-50 text-slate-600 border border-slate-200 font-medium'
                                   }`}
                                 >
                                   <span>Band {em.bandId}</span>
                                   <span>({em.freqStr})</span>
-                                  <span className={em.isDetected ? 'text-emerald-700 font-bold' : 'text-slate-400'}>
+                                  <span className={em.isDetected ? 'text-emerald-700 font-semibold' : 'text-slate-400'}>
                                     [{em.isDetected ? 'Caught' : 'Missed'}]
                                   </span>
                                 </span>
                               ))
                             ) : (
-                              <span className="text-slate-400">-</span>
+                              <span className="text-slate-400 font-mono">-</span>
                             )}
                           </div>
                         </td>
@@ -1407,7 +1413,7 @@ export default function ObservationsSection({
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={viewMode === 'environment' ? 7 : 6} className="py-8 text-center text-slate-400 select-none">
+                    <td colSpan={viewMode === 'environment' ? 7 : 6} className="py-8 text-center text-slate-400 select-none text-[13px]">
                       No dwell records in this window matching the selected filter.
                     </td>
                   </tr>

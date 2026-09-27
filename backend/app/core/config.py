@@ -12,7 +12,7 @@ DEFAULT_TOTAL_DWELLS: int = 120
 
 # Paths
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
-DEFAULT_CONFIG_PATH = BASE_DIR / "model" / "configs" / "v2_20bands_500us.yaml"
+DEFAULT_CONFIG_PATH = BASE_DIR / "model" / "configs" / "v2_production_core.yaml"
 # By default, do not pre-load dataset on backend startup; datasets are uploaded dynamically via frontend
 DEFAULT_H5_PATH: Path | None = None
 UPLOAD_DIR = BASE_DIR / "uploads"

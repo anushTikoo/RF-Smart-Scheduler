@@ -1,18 +1,38 @@
-# Virtual environments
+# Virtual environments (matches directories, symlinks, and files)
+.venv
 .venv/
+backend/.venv
 backend/.venv/
+backend/model/.venv
 backend/model/.venv/
+venv/
+venv
+env/
+env
 node_bin/
 
 # Python cache & artifacts
 __pycache__/
 *.pyc
 *.pyo
+*.pyd
 *.egg-info/
 .pytest_cache/
-backend/uploads/config_test_upload.h5
+
+# Datasets and Uploads
+uploads/
+backend/uploads/
+sample_datasets/
+*.h5
+*.hdf5
 
 # Node & Frontend
 node_modules/
 frontend/dist/
 frontend/.eslintcache
+
+# OS & Editor files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

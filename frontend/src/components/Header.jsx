@@ -107,9 +107,9 @@ export default function Header({
   };
 
   return (
-    <header className="w-full min-h-20 bg-white border-b border-slate-200 shadow-[0_1px_3px_rgba(0,0,0,0.04)] px-4 sm:px-8 lg:px-10 py-3 flex flex-wrap items-center justify-between sticky top-0 z-50 gap-4">
+    <header className="w-full min-h-20 bg-white border-b border-slate-200 shadow-[0_1px_3px_rgba(0,0,0,0.04)] px-4 sm:px-6 lg:px-8 py-3.5 sm:py-4 flex flex-wrap items-center justify-between sticky top-0 z-50 gap-4">
       {/* Top Left: Animated Waving Indian Flag & Title */}
-      <div className="flex items-center gap-3.5">
+      <div className="flex items-center gap-4">
         <div
           className="relative flex items-center justify-center overflow-hidden rounded-md select-none flag-waving-anim"
           style={{
@@ -132,10 +132,10 @@ export default function Header({
 
         {/* Title & Subtitle */}
         <div className="flex flex-col text-left">
-          <h1 className="text-[15px] sm:text-[16px] font-bold tracking-tight text-on-surface leading-tight">
+          <h1 className="text-[20px] sm:text-[24px] font-bold tracking-tight text-on-surface leading-tight">
             Adaptive RF Scan Scheduler
           </h1>
-          <p className="font-body-sm text-[11px] text-outline font-normal mt-0.5">
+          <p className="text-[13px] sm:text-[14px] text-slate-500 font-normal mt-1 leading-[20px]">
             ML-Based Frequency Band Selection for Electronic Warfare
           </p>
         </div>
@@ -145,7 +145,7 @@ export default function Header({
       <div className="flex items-center justify-end gap-3 sm:gap-4 flex-wrap sm:flex-nowrap">
         {/* Upload Dataset Button (Disabled when simulation is actively running) */}
         <label
-          className={`group inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full border shadow-xs font-label-md text-xs font-medium transition-all select-none ${
+          className={`group inline-flex items-center gap-2 px-4 py-2 rounded-full border shadow-xs font-label-md text-[13px] sm:text-[14px] font-medium transition-all select-none ${
             isScanning
               ? 'bg-slate-100/90 border-slate-200 text-slate-400 cursor-not-allowed opacity-75'
               : 'bg-white border-slate-200 text-on-surface hover:border-primary/50 hover:text-primary cursor-pointer'
@@ -180,7 +180,7 @@ export default function Header({
         {loadedDataset && (
           <div className="relative inline-block" ref={dropdownRef}>
             <button
-              className="group flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white border border-slate-200 shadow-xs text-primary font-label-md text-[12px] font-semibold hover:border-primary/50 transition-all cursor-pointer"
+              className="group flex items-center gap-2 px-4 py-2 rounded-full bg-white border border-slate-200 shadow-xs text-primary font-label-md text-[13px] sm:text-[14px] font-semibold hover:border-primary/50 transition-all cursor-pointer"
               id="view-receiver-btn"
               type="button"
               onClick={() => setIsDropdownOpen((prev) => !prev)}
@@ -200,12 +200,12 @@ export default function Header({
             </button>
 
             {isDropdownOpen && (
-              <div className="absolute right-0 top-full mt-1.5 w-48 bg-white border border-slate-200 rounded-xl shadow-[0_4px_16px_rgba(0,0,0,0.06)] p-1 z-50 animate-in fade-in slide-in-from-top-1 duration-150">
+              <div className="absolute right-0 top-full mt-2 w-48 bg-white border border-slate-200 rounded-xl shadow-[0_4px_16px_rgba(0,0,0,0.06)] p-1.5 z-50 animate-in fade-in slide-in-from-top-1 duration-150">
                 <button
-                  className={`group w-full flex items-center justify-between px-3 py-2 rounded-lg font-label-md text-[12px] font-semibold text-left transition-colors cursor-pointer ${
+                  className={`group w-full flex items-center justify-between px-3 py-2 rounded-lg font-label-md text-[13px] text-left transition-colors cursor-pointer ${
                     viewMode === 'receiver'
-                      ? 'bg-slate-50 text-primary'
-                      : 'text-on-surface-variant hover:bg-slate-50 hover:text-on-surface'
+                      ? 'bg-slate-50 text-primary font-semibold'
+                      : 'text-on-surface-variant font-medium hover:bg-slate-50 hover:text-on-surface'
                   }`}
                   type="button"
                   onClick={() => {
@@ -222,10 +222,10 @@ export default function Header({
                   )}
                 </button>
                 <button
-                  className={`group w-full flex items-center justify-between px-3 py-2 rounded-lg font-label-md text-[12px] text-left transition-colors cursor-pointer ${
+                  className={`group w-full flex items-center justify-between px-3 py-2 rounded-lg font-label-md text-[13px] text-left transition-colors cursor-pointer ${
                     viewMode === 'environment'
                       ? 'bg-slate-50 text-primary font-semibold'
-                      : 'text-on-surface-variant hover:bg-slate-50 hover:text-on-surface'
+                      : 'text-on-surface-variant font-medium hover:bg-slate-50 hover:text-on-surface'
                   }`}
                   type="button"
                   onClick={() => {
