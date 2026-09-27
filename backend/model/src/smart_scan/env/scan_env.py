@@ -6,7 +6,6 @@ import numpy as np
 
 from smart_scan.data.episode import Episode
 from smart_scan.features.context import BandContextConfig, BandContextEncoder
-from smart_scan.prediction.next_pulse import NextPulsePredictor
 
 
 @dataclass(frozen=True, slots=True)
@@ -78,7 +77,7 @@ class ScanEnvironment:
         self.episode = episode
         self.receiver = receiver or ReceiverConfig()
         self.reward_config = reward or RewardConfig()
-        self.context_config = context or BandContextConfig(version="v1")
+        self.context_config = context or BandContextConfig(version="v2")
         self.context_encoder = BandContextEncoder(self.context_config)
         (
             self.detectable_pulse_count,
@@ -117,11 +116,6 @@ class ScanEnvironment:
             raise ValueError("missed-opportunity penalty rate cannot be negative")
         self.seed = seed
         self.rng = np.random.default_rng(seed)
-        self.next_pulse_predictor = (
-            NextPulsePredictor(episode.num_bands)
-            if self.context_config.predictor_enabled
-            else None
-        )
         self.reset(return_state=False)
 
     def reset(self, *, return_state: bool = True) -> np.ndarray | None:
@@ -135,7 +129,7 @@ class ScanEnvironment:
         self.last_pulse_count = np.zeros(bands, dtype=np.float32)
         self.last_amplitude = np.full(bands, -140.0, dtype=np.float32)
         self.consecutive_no_hits = np.zeros(bands, dtype=np.float32)
-        # Compatibility alias for legacy DQN and external notebooks.
+        # Compatibility alias retained for existing context and notebook consumers.
         self.consecutive_misses = self.consecutive_no_hits
         self.last_hit_step = np.full(bands, -1, dtype=np.int32)
         self.estimated_period = np.zeros(bands, dtype=np.float32)
@@ -167,13 +161,7 @@ class ScanEnvironment:
         self.action_log: list[int] = []
         self.reward_log: list[float] = []
         self.rng = np.random.default_rng(self.seed)
-        self.next_pulse_predictor = (
-            NextPulsePredictor(self.episode.num_bands)
-            if self.context_config.predictor_enabled
-            else None
-        )
         self._feature_cache_step = -1
-        self._cached_prediction_scores: np.ndarray | None = None
         self._cached_periodic_due: np.ndarray | None = None
         self._cached_band_contexts: np.ndarray | None = None
         return self.state_vector() if return_state else None
@@ -209,11 +197,6 @@ class ScanEnvironment:
             raise RuntimeError("context must be configured before an episode starts")
         self.context_config = context
         self.context_encoder = BandContextEncoder(context)
-        self.next_pulse_predictor = (
-            NextPulsePredictor(self.episode.num_bands)
-            if context.predictor_enabled
-            else None
-        )
         self._feature_cache_step = -1
 
     def periodicity_scores(self) -> np.ndarray:
@@ -242,58 +225,14 @@ class ScanEnvironment:
         if self._feature_cache_step == self.step_index:
             return
         self._feature_cache_step = self.step_index
-        self._cached_prediction_scores = None
         self._cached_periodic_due = None
         self._cached_band_contexts = None
-
-    def prediction_scores(self) -> np.ndarray:
-        """Return per-band anonymous pulse urgency, computed once per dwell."""
-
-        self._refresh_feature_cache()
-        if self.next_pulse_predictor is None:
-            return np.zeros(self.episode.num_bands, dtype=np.float32)
-        if self._cached_prediction_scores is None:
-            self._cached_prediction_scores = self.next_pulse_predictor.band_scores(
-                self.step_index * self.episode.time_bin_s,
-                self.episode.time_bin_s * self.episode.num_bands,
-            )
-        return self._cached_prediction_scores
 
     def band_contexts(self) -> np.ndarray:
         self._refresh_feature_cache()
         if self._cached_band_contexts is None:
             self._cached_band_contexts = self.context_encoder.encode(self)
         return self._cached_band_contexts
-
-    def _legacy_band_contexts(self) -> np.ndarray:
-        self._refresh_feature_cache()
-        bands = self.episode.num_bands
-        indices = np.arange(bands, dtype=np.float32)
-        denominator = max(bands - 1, 1)
-        band_position = indices / denominator
-        switching = np.abs(indices - self.current_band) / denominator
-        pulse_feature = np.clip(np.log1p(self.last_pulse_count) / np.log(100.0), 0.0, 1.0)
-        amplitude_feature = np.clip((self.last_amplitude + 140.0) / 140.0, 0.0, 1.0)
-        miss_feature = np.clip(self.consecutive_misses / 20.0, 0.0, 1.0)
-        phase = 2.0 * np.pi * self.step_index / max(self.episode.num_steps, 1)
-        prediction_score = self.prediction_scores()
-        contexts = np.column_stack(
-            [
-                np.ones(bands, dtype=np.float32),
-                band_position,
-                self._time_since_visit(),
-                self.ewma_hit,
-                pulse_feature,
-                amplitude_feature,
-                miss_feature,
-                self._periodic_due(),
-                prediction_score,
-                switching,
-                np.full(bands, np.sin(phase), dtype=np.float32),
-                np.full(bands, np.cos(phase), dtype=np.float32),
-            ]
-        )
-        return contexts.astype(np.float32, copy=False)
 
     def state_vector(self) -> np.ndarray:
         contexts = self.band_contexts()[:, 1:]
@@ -500,15 +439,6 @@ class ScanEnvironment:
         self.total_dead_time_s += min(dead_time_s, self.episode.time_bin_s)
         self.action_log.append(action)
         self.reward_log.append(float(reward))
-        # V2 updates once per selected dwell, not once per pulse. It receives
-        # only the observed band/activity flag; labels and hidden truth never
-        # enter the prediction or context path.
-        if self.next_pulse_predictor is not None:
-            self.next_pulse_predictor.update_dwell(
-                observation_time_s=(t + 1) * self.episode.time_bin_s,
-                band_index=action,
-                active=bool(pulses > 0),
-            )
         self.step_index += 1
         return Transition(
             reward=float(reward),
@@ -591,18 +521,4 @@ class ScanEnvironment:
             "pulses_lost_to_latency": float(self.pulses_lost_to_latency),
             "receiver_dead_time_s": self.total_dead_time_s,
             "oracle_band_accuracy": self.oracle_correct / max(self.oracle_opportunities, 1),
-            **(
-                self.next_pulse_predictor.metrics()
-                if self.next_pulse_predictor is not None
-                else {
-                    "next_active_dwell_timing_mae_s": 0.0,
-                    "next_active_band_accuracy": 0.0,
-                    "next_active_prediction_count": 0.0,
-                    "next_active_prediction_coverage": 0.0,
-                    "predictor_dwell_updates": 0.0,
-                    "intercept_time_prediction_mae_s": 0.0,
-                    "next_pulse_band_accuracy": 0.0,
-                    "next_pulse_prediction_count": 0.0,
-                }
-            ),
         }

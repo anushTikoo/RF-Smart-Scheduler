@@ -38,12 +38,6 @@ def figures_of_merit(aggregate: dict[str, object]) -> dict[str, object]:
                 ),
                 "unique_emitter_coverage": mean("unique_emitter_coverage"),
                 "mean_revisit_interval_s": mean("mean_revisit_interval_s"),
-                "next_active_band_prediction_accuracy_percent": 100.0
-                * mean("next_active_band_accuracy"),
-                "next_active_dwell_timing_mae_s": mean(
-                    "next_active_dwell_timing_mae_s"
-                ),
-                "prediction_coverage": mean("next_active_prediction_coverage"),
                 "scheduler_decision_p99_s": mean("scheduler_decision_p99_s"),
                 "scheduler_deadline_miss_rate": mean(
                     "scheduler_deadline_miss_rate"
@@ -57,8 +51,7 @@ def figures_of_merit(aggregate: dict[str, object]) -> dict[str, object]:
             "sensitivity": "Configured PDW amplitude threshold, not measured RF hardware sensitivity.",
             "correct_scan_rate": "Fraction of globally active dwells in which the selected band contained an eligible emission.",
             "missed_opportunity": "Activity existed somewhere in the spectrum but the action produced no interception; this is not a false alarm.",
-            "prediction_accuracy": "Conditional next-active-band accuracy from causal selected-band observations. Oracle accuracy is debug-only and omitted here.",
-            "intercept_time_error": "Conditional next-active-dwell timing MAE from selected-band observation history.",
+            "oracle_accuracy": "Oracle best-band accuracy is debug-only and omitted from the main report.",
         },
         "figures_of_merit": rows,
     }

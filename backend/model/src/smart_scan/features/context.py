@@ -21,7 +21,7 @@ V2_CORE_FEATURES = (
 
 @dataclass(frozen=True, slots=True)
 class BandContextConfig:
-    """Versioned, causal per-band feature configuration.
+    """Causal per-band feature configuration for the selected V2 model.
 
     V2 deliberately excludes absolute band position/identity, mission phase,
     amplitude, and switching distance. The shared LinUCB model therefore learns
@@ -29,12 +29,11 @@ class BandContextConfig:
     """
 
     version: str = "v2"
-    predictor_enabled: bool = True
     pulse_count_reference: float = 128.0
     no_hit_reference: float = 5.0
 
     def __post_init__(self) -> None:
-        if self.version not in {"v1", "v2"}:
+        if self.version != "v2":
             raise ValueError(f"unsupported context version: {self.version}")
         if self.pulse_count_reference <= 0:
             raise ValueError("pulse_count_reference must be positive")
@@ -43,23 +42,6 @@ class BandContextConfig:
 
     @property
     def feature_names(self) -> tuple[str, ...]:
-        if self.version == "v1":
-            return (
-                "bias",
-                "band_position",
-                "time_since_visit",
-                "observed_hit_ewma",
-                "previous_observed_pulse_count",
-                "previous_observed_amplitude",
-                "consecutive_no_hits",
-                "learned_periodicity",
-                "prediction_urgency",
-                "switching_distance",
-                "mission_phase_sin",
-                "mission_phase_cos",
-            )
-        if self.predictor_enabled:
-            return (*V2_CORE_FEATURES, "prediction_urgency")
         return V2_CORE_FEATURES
 
 
@@ -74,9 +56,6 @@ class BandContextEncoder:
         return self.config.feature_names
 
     def encode(self, env: "ScanEnvironment") -> np.ndarray:
-        if self.config.version == "v1":
-            return env._legacy_band_contexts()
-
         bands = env.episode.num_bands
         elapsed = np.where(
             env.last_visit < 0,
@@ -95,7 +74,7 @@ class BandContextEncoder:
             0.0,
             1.0,
         )
-        columns: list[np.ndarray] = [
+        columns = [
             np.ones(bands, dtype=np.float32),
             time_since_visit.astype(np.float32),
             env.ewma_hit.astype(np.float32),
@@ -103,6 +82,4 @@ class BandContextEncoder:
             no_hits.astype(np.float32),
             env.periodicity_scores().astype(np.float32),
         ]
-        if self.config.predictor_enabled:
-            columns.append(env.prediction_scores().astype(np.float32))
         return np.column_stack(columns).astype(np.float32, copy=False)

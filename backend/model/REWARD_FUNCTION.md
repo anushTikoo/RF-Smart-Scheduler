@@ -52,4 +52,4 @@ The hit term is directly observable. The global miss and pending-emitter terms r
 
 ## Exploration
 
-LinUCB does not use epsilon-greedy exploration. It explores using its upper-confidence uncertainty bonus, coverage urgency, and the hard overdue/unvisited-band constraint. Epsilon remains only in the optional DQN implementation, which is currently paused.
+LinUCB does not use epsilon-greedy exploration. It explores using its upper-confidence uncertainty bonus, coverage urgency, and the hard overdue/unvisited-band constraint.

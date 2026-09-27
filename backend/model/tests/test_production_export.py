@@ -34,7 +34,6 @@ def test_production_bundle_is_portable_and_frozen(tmp_path: Path) -> None:
             "coverage_bonus_weight": 1.0,
             "shared_model": True,
             "context_version": "v2",
-            "predictor_enabled": False,
             "pulse_count_reference": 8.0,
             "no_hit_reference": 5.0,
         },
@@ -59,13 +58,11 @@ def test_production_bundle_is_portable_and_frozen(tmp_path: Path) -> None:
         },
         "context": {
             "version": "v2",
-            "predictor_enabled": False,
             "pulse_count_reference": "train_p95",
             "no_hit_reference": 5.0,
         },
         "linucb": {
             "alpha": 0.5,
-            "predictor_enabled": False,
         },
     }
     archive = tmp_path / "artifact.zip"
@@ -95,4 +92,3 @@ def test_production_bundle_is_portable_and_frozen(tmp_path: Path) -> None:
         "training_history.json",
         "SHA256SUMS.txt",
     } <= names
-

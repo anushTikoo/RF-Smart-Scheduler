@@ -1,6 +1,6 @@
 schema_version: 2
 seed: 42
-model_status: production_training
+model_status: selected_configuration
 receiver:
   frequency_min_mhz: 500.0
   frequency_max_mhz: 18000.0
@@ -14,7 +14,6 @@ receiver:
   settling_time_us: 0.0
 context:
   version: v2
-  predictor_enabled: false
   pulse_count_reference: train_p95
   no_hit_reference: 5.0
 reward:
@@ -24,7 +23,7 @@ reward:
 history:
   ewma_alpha: 0.2
 linucb:
-  # Frozen after the 30-train/10-validation selection experiment.
+  # Selected core configuration used by the frozen 200-scenario checkpoint.
   alpha: 0.5
   regularization: 1.0
   min_revisit_factor: 0.5
@@ -33,5 +32,3 @@ linucb:
   coverage_bonus_weight: 1.0
   shared_model: true
   context_version: v2
-  predictor_enabled: false
-

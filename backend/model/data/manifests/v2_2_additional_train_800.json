@@ -1,0 +1,4006 @@
+{
+  "dataset_id": "alan-turing-institute/turing-synthetic-radar-dataset",
+  "description": "V2.2 continuation set: 800 additional whole train_stare scenarios, config IDs 200 through 999. These extend the frozen 200-scenario model.",
+  "files": [
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 200
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 201
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 202
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 203
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 204
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 205
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 206
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 207
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 208
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 209
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 210
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 211
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 212
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 213
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 214
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 215
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 216
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 217
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 218
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 219
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 220
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 221
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 222
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 223
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 224
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 225
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 226
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 227
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 228
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 229
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 230
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 231
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 232
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 233
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 234
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 235
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 236
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 237
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 238
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 239
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 240
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 241
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 242
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 243
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 244
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 245
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 246
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 247
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 248
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 249
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 250
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 251
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 252
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 253
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 254
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 255
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 256
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 257
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 258
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 259
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 260
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 261
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 262
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 263
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 264
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 265
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 266
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 267
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 268
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 269
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 270
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 271
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 272
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 273
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 274
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 275
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 276
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 277
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 278
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 279
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 280
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 281
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 282
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 283
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 284
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 285
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 286
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 287
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 288
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 289
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 290
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 291
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 292
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 293
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 294
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 295
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 296
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 297
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 298
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 299
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 300
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 301
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 302
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 303
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 304
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 305
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 306
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 307
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 308
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 309
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 310
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 311
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 312
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 313
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 314
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 315
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 316
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 317
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 318
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 319
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 320
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 321
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 322
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 323
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 324
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 325
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 326
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 327
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 328
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 329
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 330
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 331
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 332
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 333
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 334
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 335
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 336
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 337
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 338
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 339
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 340
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 341
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 342
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 343
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 344
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 345
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 346
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 347
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 348
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 349
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 350
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 351
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 352
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 353
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 354
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 355
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 356
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 357
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 358
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 359
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 360
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 361
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 362
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 363
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 364
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 365
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 366
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 367
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 368
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 369
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 370
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 371
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 372
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 373
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 374
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 375
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 376
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 377
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 378
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 379
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 380
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 381
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 382
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 383
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 384
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 385
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 386
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 387
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 388
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 389
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 390
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 391
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 392
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 393
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 394
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 395
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 396
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 397
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 398
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 399
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 400
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 401
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 402
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 403
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 404
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 405
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 406
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 407
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 408
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 409
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 410
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 411
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 412
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 413
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 414
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 415
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 416
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 417
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 418
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 419
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 420
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 421
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 422
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 423
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 424
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 425
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 426
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 427
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 428
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 429
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 430
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 431
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 432
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 433
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 434
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 435
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 436
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 437
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 438
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 439
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 440
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 441
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 442
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 443
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 444
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 445
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 446
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 447
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 448
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 449
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 450
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 451
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 452
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 453
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 454
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 455
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 456
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 457
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 458
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 459
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 460
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 461
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 462
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 463
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 464
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 465
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 466
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 467
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 468
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 469
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 470
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 471
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 472
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 473
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 474
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 475
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 476
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 477
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 478
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 479
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 480
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 481
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 482
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 483
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 484
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 485
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 486
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 487
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 488
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 489
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 490
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 491
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 492
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 493
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 494
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 495
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 496
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 497
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 498
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 499
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 500
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 501
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 502
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 503
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 504
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 505
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 506
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 507
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 508
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 509
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 510
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 511
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 512
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 513
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 514
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 515
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 516
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 517
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 518
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 519
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 520
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 521
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 522
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 523
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 524
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 525
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 526
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 527
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 528
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 529
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 530
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 531
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 532
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 533
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 534
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 535
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 536
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 537
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 538
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 539
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 540
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 541
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 542
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 543
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 544
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 545
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 546
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 547
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 548
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 549
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 550
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 551
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 552
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 553
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 554
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 555
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 556
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 557
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 558
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 559
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 560
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 561
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 562
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 563
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 564
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 565
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 566
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 567
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 568
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 569
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 570
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 571
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 572
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 573
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 574
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 575
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 576
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 577
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 578
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 579
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 580
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 581
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 582
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 583
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 584
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 585
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 586
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 587
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 588
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 589
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 590
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 591
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 592
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 593
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 594
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 595
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 596
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 597
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 598
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 599
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 600
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 601
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 602
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 603
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 604
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 605
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 606
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 607
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 608
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 609
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 610
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 611
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 612
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 613
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 614
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 615
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 616
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 617
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 618
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 619
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 620
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 621
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 622
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 623
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 624
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 625
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 626
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 627
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 628
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 629
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 630
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 631
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 632
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 633
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 634
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 635
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 636
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 637
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 638
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 639
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 640
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 641
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 642
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 643
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 644
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 645
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 646
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 647
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 648
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 649
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 650
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 651
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 652
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 653
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 654
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 655
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 656
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 657
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 658
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 659
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 660
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 661
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 662
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 663
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 664
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 665
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 666
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 667
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 668
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 669
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 670
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 671
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 672
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 673
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 674
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 675
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 676
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 677
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 678
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 679
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 680
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 681
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 682
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 683
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 684
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 685
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 686
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 687
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 688
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 689
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 690
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 691
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 692
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 693
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 694
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 695
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 696
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 697
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 698
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 699
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 700
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 701
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 702
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 703
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 704
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 705
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 706
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 707
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 708
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 709
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 710
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 711
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 712
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 713
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 714
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 715
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 716
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 717
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 718
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 719
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 720
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 721
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 722
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 723
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 724
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 725
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 726
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 727
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 728
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 729
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 730
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 731
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 732
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 733
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 734
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 735
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 736
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 737
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 738
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 739
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 740
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 741
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 742
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 743
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 744
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 745
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 746
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 747
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 748
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 749
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 750
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 751
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 752
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 753
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 754
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 755
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 756
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 757
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 758
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 759
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 760
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 761
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 762
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 763
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 764
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 765
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 766
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 767
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 768
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 769
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 770
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 771
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 772
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 773
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 774
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 775
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 776
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 777
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 778
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 779
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 780
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 781
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 782
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 783
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 784
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 785
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 786
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 787
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 788
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 789
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 790
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 791
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 792
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 793
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 794
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 795
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 796
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 797
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 798
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 799
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 800
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 801
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 802
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 803
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 804
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 805
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 806
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 807
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 808
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 809
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 810
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 811
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 812
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 813
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 814
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 815
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 816
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 817
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 818
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 819
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 820
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 821
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 822
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 823
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 824
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 825
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 826
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 827
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 828
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 829
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 830
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 831
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 832
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 833
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 834
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 835
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 836
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 837
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 838
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 839
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 840
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 841
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 842
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 843
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 844
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 845
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 846
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 847
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 848
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 849
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 850
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 851
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 852
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 853
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 854
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 855
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 856
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 857
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 858
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 859
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 860
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 861
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 862
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 863
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 864
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 865
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 866
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 867
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 868
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 869
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 870
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 871
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 872
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 873
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 874
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 875
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 876
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 877
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 878
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 879
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 880
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 881
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 882
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 883
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 884
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 885
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 886
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 887
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 888
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 889
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 890
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 891
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 892
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 893
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 894
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 895
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 896
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 897
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 898
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 899
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 900
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 901
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 902
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 903
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 904
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 905
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 906
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 907
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 908
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 909
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 910
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 911
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 912
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 913
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 914
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 915
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 916
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 917
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 918
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 919
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 920
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 921
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 922
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 923
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 924
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 925
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 926
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 927
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 928
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 929
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 930
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 931
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 932
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 933
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 934
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 935
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 936
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 937
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 938
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 939
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 940
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 941
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 942
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 943
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 944
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 945
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 946
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 947
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 948
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 949
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 950
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 951
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 952
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 953
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 954
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 955
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 956
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 957
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 958
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 959
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 960
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 961
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 962
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 963
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 964
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 965
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 966
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 967
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 968
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 969
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 970
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 971
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 972
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 973
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 974
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 975
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 976
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 977
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 978
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 979
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 980
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 981
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 982
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 983
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 984
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 985
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 986
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 987
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 988
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 989
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 990
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 991
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 992
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 993
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 994
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 995
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 996
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 997
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 998
+    },
+    {
+      "split": "train",
+      "mode": "stare",
+      "config_id": 999
+    }
+  ]
+}

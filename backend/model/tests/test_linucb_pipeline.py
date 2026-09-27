@@ -144,6 +144,46 @@ def test_train_linucb_resumes_completed_scenarios(tmp_path) -> None:
     assert resumed.num_updates == episode.num_steps
 
 
+def test_train_linucb_can_continue_from_frozen_checkpoint(tmp_path) -> None:
+    first_path = tmp_path / "first.npz"
+    second_path = tmp_path / "second.npz"
+    first_episode = make_synthetic_episode(
+        num_steps=20, num_bands=4, num_emitters=2, seed=20
+    )
+    second_episode = make_synthetic_episode(
+        num_steps=25, num_bands=4, num_emitters=2, seed=21
+    )
+    first_episode.save(first_path)
+    second_episode.save(second_path)
+    options = {
+        "shared_model": True,
+        "alpha": 0.5,
+        "regularization": 1.0,
+        "context_version": "v2",
+        "pulse_count_reference": 8.0,
+        "no_hit_reference": 5.0,
+    }
+    base_path = tmp_path / "base" / "linucb.npz"
+    base = train_linucb(
+        [first_path],
+        output_path=base_path,
+        receiver=ReceiverConfig(),
+        reward=RewardConfig(),
+        linucb_options=options,
+    )
+    continued = train_linucb(
+        [second_path],
+        output_path=tmp_path / "continued" / "linucb.npz",
+        receiver=ReceiverConfig(),
+        reward=RewardConfig(),
+        linucb_options=options,
+        initial_checkpoint_path=base_path,
+    )
+
+    assert base.num_updates == first_episode.num_steps
+    assert continued.num_updates == first_episode.num_steps + second_episode.num_steps
+
+
 def test_v2_checkpoint_rejects_different_receiver_geometry(tmp_path) -> None:
     episode = make_synthetic_episode(
         num_steps=20, num_bands=20, num_emitters=2, seed=8
@@ -152,7 +192,6 @@ def test_v2_checkpoint_rejects_different_receiver_geometry(tmp_path) -> None:
     scheduler = LinUCBScheduler(
         shared_model=True,
         context_version="v2",
-        predictor_enabled=False,
         pulse_count_reference=10.0,
     )
     run_episode(episode, scheduler)

@@ -1,4 +1,5 @@
 .venv/
+*.egg-info/
 __pycache__/
 *.py[cod]
 .pytest_cache/
@@ -10,3 +11,7 @@ data/processed/
 data/processed_v2_*/
 outputs/
 *.pt
+
+# Keep project notes local; retain the repository README.
+*.md
+!README.md

@@ -55,11 +55,15 @@ def export_bundle(
     training_scenarios: int,
     epochs: int,
     pulse_count_reference: float,
+    model_filename: str = MODEL_FILENAME,
+    config_filename: str = CONFIG_FILENAME,
+    model_version: str = "v2",
+    pulse_count_reference_source: str = "estimated from all production training scenarios",
 ) -> dict[str, object]:
     bundle_dir = output_dir / "frozen_model"
     bundle_dir.mkdir(parents=True, exist_ok=True)
 
-    model_path = bundle_dir / MODEL_FILENAME
+    model_path = bundle_dir / model_filename
     trained = LinUCBScheduler.load(trained_checkpoint, update_enabled=False)
     trained.artifact_metadata = {
         **trained.artifact_metadata,
@@ -68,6 +72,7 @@ def export_bundle(
         "training_scenario_count": training_scenarios,
         "epochs": epochs,
         "selected_candidate": "v2_core",
+        "model_version": model_version,
         "selection_completed_before_production_training": True,
     }
     trained.save(model_path)
@@ -82,8 +87,8 @@ def export_bundle(
     frozen_config["model_status"] = "frozen"
     frozen_config["context"]["pulse_count_reference"] = pulse_count_reference
     frozen_config["linucb"]["pulse_count_reference"] = pulse_count_reference
-    frozen_config["linucb"]["checkpoint"] = MODEL_FILENAME
-    (bundle_dir / CONFIG_FILENAME).write_text(
+    frozen_config["linucb"]["checkpoint"] = model_filename
+    (bundle_dir / config_filename).write_text(
         yaml.safe_dump(frozen_config, sort_keys=False), encoding="utf-8"
     )
     shutil.copy2(manifest_path, bundle_dir / MANIFEST_FILENAME)
@@ -98,24 +103,25 @@ def export_bundle(
     metadata = {
         "schema_version": 1,
         "artifact_status": "frozen",
+        "model_version": model_version,
         "model_type": "LinUCB contextual bandit",
         "selected_candidate": "v2_core",
-        "predictor_enabled": False,
         "online_updates_enabled": False,
         "created_utc": datetime.now(timezone.utc).isoformat(),
         "training_scenario_count": training_scenarios,
         "epochs": epochs,
         "num_updates": frozen.num_updates,
         "pulse_count_reference_train_p95": pulse_count_reference,
+        "pulse_count_reference_source": pulse_count_reference_source,
         "training_manifest_sha256": file_sha256(manifest_path),
-        "checkpoint": MODEL_FILENAME,
-        "configuration": CONFIG_FILENAME,
+        "checkpoint": model_filename,
+        "configuration": config_filename,
         "feature_names": embedded.get("feature_names", []),
         "environment": embedded.get("environment", {}),
         "selection_protocol": (
             "Hyperparameters were selected using the earlier 30-train/10-validation "
             "experiment and evaluated once on the untouched 10-scenario holdout. "
-            "No validation or test files are included in this 100-scenario fit."
+            f"No validation or test files are included in this {training_scenarios}-scenario fit."
         ),
         "deployment_note": (
             "LinUCBScheduler.load(checkpoint) defaults to frozen inference. "
@@ -214,8 +220,6 @@ def main() -> int:
 
     configuration = load_config(args.config)
     options = linucb_kwargs(configuration)
-    if options.get("predictor_enabled") is not False:
-        raise ValueError("production model must use the selected predictor-disabled core")
     if float(options.get("alpha", -1.0)) != 0.5:
         raise ValueError("production model must use the selected alpha=0.5")
 
@@ -267,4 +271,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-
