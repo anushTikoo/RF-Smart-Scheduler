@@ -1,0 +1,12 @@
+# RF-Smart-Scheduler Backend Requirements
+fastapi>=0.115.0
+uvicorn[standard]>=0.30.0
+websockets>=13.0
+python-multipart>=0.0.12
+h5py>=3.12.0
+numpy>=2.0.0
+PyYAML>=6.0.0
+pydantic>=2.9.0
+huggingface-hub>=0.27.0
+pytest>=8.3.0
+-e ./model

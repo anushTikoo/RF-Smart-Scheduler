@@ -1,0 +1,18 @@
+# Virtual environments
+.venv/
+backend/.venv/
+backend/model/.venv/
+node_bin/
+
+# Python cache & artifacts
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.pytest_cache/
+backend/uploads/config_test_upload.h5
+
+# Node & Frontend
+node_modules/
+frontend/dist/
+frontend/.eslintcache
