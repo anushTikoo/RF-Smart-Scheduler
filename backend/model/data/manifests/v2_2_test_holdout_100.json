@@ -1,0 +1,506 @@
+{
+  "dataset_id": "alan-turing-institute/turing-synthetic-radar-dataset",
+  "description": "Sealed V2.2 final test set: 100 whole test_stare scenarios, config IDs 47 through 146. Never use for training, tuning, or model selection.",
+  "files": [
+    {
+      "split": "test",
+      "mode": "stare",
+      "config_id": 47
+    },
+    {
+      "split": "test",
+      "mode": "stare",
+      "config_id": 48
+    },
+    {
+      "split": "test",
+      "mode": "stare",
+      "config_id": 49
+    },
+    {
+      "split": "test",
+      "mode": "stare",
+      "config_id": 50
+    },
+    {
+      "split": "test",
+      "mode": "stare",
+      "config_id": 51
+    },
+    {
+      "split": "test",
+      "mode": "stare",
+      "config_id": 52
+    },
+    {
+      "split": "test",
+      "mode": "stare",
+      "config_id": 53
+    },
+    {
+      "split": "test",
+      "mode": "stare",
+      "config_id": 54
+    },
+    {
+      "split": "test",
+      "mode": "stare",
+      "config_id": 55
+    },
+    {
+      "split": "test",
+      "mode": "stare",
+      "config_id": 56
+    },
+    {
+      "split": "test",
+      "mode": "stare",
+      "config_id": 57
+    },
+    {
+      "split": "test",
+      "mode": "stare",
+      "config_id": 58
+    },
+    {
+      "split": "test",
+      "mode": "stare",
+      "config_id": 59
+    },
+    {
+      "split": "test",
+      "mode": "stare",
+      "config_id": 60
+    },
+    {
+      "split": "test",
+      "mode": "stare",
+      "config_id": 61
+    },
+    {
+      "split": "test",
+      "mode": "stare",
+      "config_id": 62
+    },
+    {
+      "split": "test",
+      "mode": "stare",
+      "config_id": 63
+    },
+    {
+      "split": "test",
+      "mode": "stare",
+      "config_id": 64
+    },
+    {
+      "split": "test",
+      "mode": "stare",
+      "config_id": 65
+    },
+    {
+      "split": "test",
+      "mode": "stare",
+      "config_id": 66
+    },
+    {
+      "split": "test",
+      "mode": "stare",
+      "config_id": 67
+    },
+    {
+      "split": "test",
+      "mode": "stare",
+      "config_id": 68
+    },
+    {
+      "split": "test",
+      "mode": "stare",
+      "config_id": 69
+    },
+    {
+      "split": "test",
+      "mode": "stare",
+      "config_id": 70
+    },
+    {
+      "split": "test",
+      "mode": "stare",
+      "config_id": 71
+    },
+    {
+      "split": "test",
+      "mode": "stare",
+      "config_id": 72
+    },
+    {
+      "split": "test",
+      "mode": "stare",
+      "config_id": 73
+    },
+    {
+      "split": "test",
+      "mode": "stare",
+      "config_id": 74
+    },
+    {
+      "split": "test",
+      "mode": "stare",
+      "config_id": 75
+    },
+    {
+      "split": "test",
+      "mode": "stare",
+      "config_id": 76
+    },
+    {
+      "split": "test",
+      "mode": "stare",
+      "config_id": 77
+    },
+    {
+      "split": "test",
+      "mode": "stare",
+      "config_id": 78
+    },
+    {
+      "split": "test",
+      "mode": "stare",
+      "config_id": 79
+    },
+    {
+      "split": "test",
+      "mode": "stare",
+      "config_id": 80
+    },
+    {
+      "split": "test",
+      "mode": "stare",
+      "config_id": 81
+    },
+    {
+      "split": "test",
+      "mode": "stare",
+      "config_id": 82
+    },
+    {
+      "split": "test",
+      "mode": "stare",
+      "config_id": 83
+    },
+    {
+      "split": "test",
+      "mode": "stare",
+      "config_id": 84
+    },
+    {
+      "split": "test",
+      "mode": "stare",
+      "config_id": 85
+    },
+    {
+      "split": "test",
+      "mode": "stare",
+      "config_id": 86
+    },
+    {
+      "split": "test",
+      "mode": "stare",
+      "config_id": 87
+    },
+    {
+      "split": "test",
+      "mode": "stare",
+      "config_id": 88
+    },
+    {
+      "split": "test",
+      "mode": "stare",
+      "config_id": 89
+    },
+    {
+      "split": "test",
+      "mode": "stare",
+      "config_id": 90
+    },
+    {
+      "split": "test",
+      "mode": "stare",
+      "config_id": 91
+    },
+    {
+      "split": "test",
+      "mode": "stare",
+      "config_id": 92
+    },
+    {
+      "split": "test",
+      "mode": "stare",
+      "config_id": 93
+    },
+    {
+      "split": "test",
+      "mode": "stare",
+      "config_id": 94
+    },
+    {
+      "split": "test",
+      "mode": "stare",
+      "config_id": 95
+    },
+    {
+      "split": "test",
+      "mode": "stare",
+      "config_id": 96
+    },
+    {
+      "split": "test",
+      "mode": "stare",
+      "config_id": 97
+    },
+    {
+      "split": "test",
+      "mode": "stare",
+      "config_id": 98
+    },
+    {
+      "split": "test",
+      "mode": "stare",
+      "config_id": 99
+    },
+    {
+      "split": "test",
+      "mode": "stare",
+      "config_id": 100
+    },
+    {
+      "split": "test",
+      "mode": "stare",
+      "config_id": 101
+    },
+    {
+      "split": "test",
+      "mode": "stare",
+      "config_id": 102
+    },
+    {
+      "split": "test",
+      "mode": "stare",
+      "config_id": 103
+    },
+    {
+      "split": "test",
+      "mode": "stare",
+      "config_id": 104
+    },
+    {
+      "split": "test",
+      "mode": "stare",
+      "config_id": 105
+    },
+    {
+      "split": "test",
+      "mode": "stare",
+      "config_id": 106
+    },
+    {
+      "split": "test",
+      "mode": "stare",
+      "config_id": 107
+    },
+    {
+      "split": "test",
+      "mode": "stare",
+      "config_id": 108
+    },
+    {
+      "split": "test",
+      "mode": "stare",
+      "config_id": 109
+    },
+    {
+      "split": "test",
+      "mode": "stare",
+      "config_id": 110
+    },
+    {
+      "split": "test",
+      "mode": "stare",
+      "config_id": 111
+    },
+    {
+      "split": "test",
+      "mode": "stare",
+      "config_id": 112
+    },
+    {
+      "split": "test",
+      "mode": "stare",
+      "config_id": 113
+    },
+    {
+      "split": "test",
+      "mode": "stare",
+      "config_id": 114
+    },
+    {
+      "split": "test",
+      "mode": "stare",
+      "config_id": 115
+    },
+    {
+      "split": "test",
+      "mode": "stare",
+      "config_id": 116
+    },
+    {
+      "split": "test",
+      "mode": "stare",
+      "config_id": 117
+    },
+    {
+      "split": "test",
+      "mode": "stare",
+      "config_id": 118
+    },
+    {
+      "split": "test",
+      "mode": "stare",
+      "config_id": 119
+    },
+    {
+      "split": "test",
+      "mode": "stare",
+      "config_id": 120
+    },
+    {
+      "split": "test",
+      "mode": "stare",
+      "config_id": 121
+    },
+    {
+      "split": "test",
+      "mode": "stare",
+      "config_id": 122
+    },
+    {
+      "split": "test",
+      "mode": "stare",
+      "config_id": 123
+    },
+    {
+      "split": "test",
+      "mode": "stare",
+      "config_id": 124
+    },
+    {
+      "split": "test",
+      "mode": "stare",
+      "config_id": 125
+    },
+    {
+      "split": "test",
+      "mode": "stare",
+      "config_id": 126
+    },
+    {
+      "split": "test",
+      "mode": "stare",
+      "config_id": 127
+    },
+    {
+      "split": "test",
+      "mode": "stare",
+      "config_id": 128
+    },
+    {
+      "split": "test",
+      "mode": "stare",
+      "config_id": 129
+    },
+    {
+      "split": "test",
+      "mode": "stare",
+      "config_id": 130
+    },
+    {
+      "split": "test",
+      "mode": "stare",
+      "config_id": 131
+    },
+    {
+      "split": "test",
+      "mode": "stare",
+      "config_id": 132
+    },
+    {
+      "split": "test",
+      "mode": "stare",
+      "config_id": 133
+    },
+    {
+      "split": "test",
+      "mode": "stare",
+      "config_id": 134
+    },
+    {
+      "split": "test",
+      "mode": "stare",
+      "config_id": 135
+    },
+    {
+      "split": "test",
+      "mode": "stare",
+      "config_id": 136
+    },
+    {
+      "split": "test",
+      "mode": "stare",
+      "config_id": 137
+    },
+    {
+      "split": "test",
+      "mode": "stare",
+      "config_id": 138
+    },
+    {
+      "split": "test",
+      "mode": "stare",
+      "config_id": 139
+    },
+    {
+      "split": "test",
+      "mode": "stare",
+      "config_id": 140
+    },
+    {
+      "split": "test",
+      "mode": "stare",
+      "config_id": 141
+    },
+    {
+      "split": "test",
+      "mode": "stare",
+      "config_id": 142
+    },
+    {
+      "split": "test",
+      "mode": "stare",
+      "config_id": 143
+    },
+    {
+      "split": "test",
+      "mode": "stare",
+      "config_id": 144
+    },
+    {
+      "split": "test",
+      "mode": "stare",
+      "config_id": 145
+    },
+    {
+      "split": "test",
+      "mode": "stare",
+      "config_id": 146
+    }
+  ]
+}

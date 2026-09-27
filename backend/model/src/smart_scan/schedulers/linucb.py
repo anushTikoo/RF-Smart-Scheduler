@@ -24,8 +24,7 @@ class LinUCBScheduler(Scheduler):
         shared_model: bool = False,
         preserve_model_across_episodes: bool = False,
         update_enabled: bool = True,
-        context_version: str = "v1",
-        predictor_enabled: bool = True,
+        context_version: str = "v2",
         pulse_count_reference: float = 128.0,
         no_hit_reference: float = 5.0,
     ) -> None:
@@ -46,7 +45,6 @@ class LinUCBScheduler(Scheduler):
         self.update_enabled = update_enabled
         self.context_config = BandContextConfig(
             version=context_version,
-            predictor_enabled=predictor_enabled,
             pulse_count_reference=pulse_count_reference,
             no_hit_reference=no_hit_reference,
         )
@@ -222,7 +220,6 @@ class LinUCBScheduler(Scheduler):
             "num_bands": self._num_bands,
             "context_size": self._context_size,
             "context_version": self.context_config.version,
-            "predictor_enabled": self.context_config.predictor_enabled,
             "pulse_count_reference": self.context_config.pulse_count_reference,
             "no_hit_reference": self.context_config.no_hit_reference,
             "feature_names": list(self._feature_names or ()),
@@ -259,8 +256,7 @@ class LinUCBScheduler(Scheduler):
                 shared_model=bool(metadata.get("shared_model", False)),
                 preserve_model_across_episodes=True,
                 update_enabled=update_enabled,
-                context_version=str(metadata.get("context_version", "v1")),
-                predictor_enabled=bool(metadata.get("predictor_enabled", True)),
+                context_version=str(metadata.get("context_version", "v2")),
                 pulse_count_reference=float(
                     metadata.get("pulse_count_reference", 128.0)
                 ),

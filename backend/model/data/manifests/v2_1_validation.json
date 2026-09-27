@@ -1,0 +1,16 @@
+{
+  "dataset_id": "alan-turing-institute/turing-synthetic-radar-dataset",
+  "description": "Fresh validation scenarios for comparing the frozen 100- and 200-scenario LinUCB checkpoints. Not part of either training set and not a final test set.",
+  "files": [
+    {"split": "val", "mode": "stare", "config_id": 10},
+    {"split": "val", "mode": "stare", "config_id": 11},
+    {"split": "val", "mode": "stare", "config_id": 12},
+    {"split": "val", "mode": "stare", "config_id": 13},
+    {"split": "val", "mode": "stare", "config_id": 14},
+    {"split": "val", "mode": "stare", "config_id": 15},
+    {"split": "val", "mode": "stare", "config_id": 16},
+    {"split": "val", "mode": "stare", "config_id": 17},
+    {"split": "val", "mode": "stare", "config_id": 18},
+    {"split": "val", "mode": "stare", "config_id": 19}
+  ]
+}

@@ -5,15 +5,18 @@ import pytest
 from smart_scan.data.split_integrity import validate_split_manifests
 
 
-def test_scaled_manifests_are_disjoint_and_have_expected_counts() -> None:
+def test_final_manifests_are_disjoint_and_have_expected_counts() -> None:
     result = validate_split_manifests(
         [
-            "data/manifests/scaled_train_val.json",
-            "data/manifests/scaled_test_holdout.json",
+            "data/manifests/v2_production_train_100.json",
+            "data/manifests/v2_additional_train_100.json",
+            "data/manifests/v2_2_validation_100.json",
+            "data/manifests/v2_2_test_holdout_100.json",
         ]
     )
-    assert result["counts"] == {"train": 30, "val": 10, "test": 10}
-    assert result["total_files"] == 50
+    assert result["counts"] == {"train": 200, "val": 100, "test": 100}
+    assert result["total_files"] == 400
+    assert result["whole_file_split"] is True
     assert result["duplicate_source_files"] == 0
 
 

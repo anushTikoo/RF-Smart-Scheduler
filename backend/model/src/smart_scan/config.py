@@ -9,7 +9,7 @@ from smart_scan.env.scan_env import ReceiverConfig, RewardConfig
 from smart_scan.features.context import BandContextConfig
 
 
-DEFAULT_CONFIG_PATH = Path("configs/micro.yaml")
+DEFAULT_CONFIG_PATH = Path("configs/v2_production_core.yaml")
 
 
 def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> dict[str, Any]:
@@ -54,8 +54,7 @@ def reward_config(payload: dict[str, Any]) -> RewardConfig:
 def context_config(payload: dict[str, Any]) -> BandContextConfig:
     context = payload.get("context", {})
     return BandContextConfig(
-        version=str(context.get("version", "v1")),
-        predictor_enabled=bool(context.get("predictor_enabled", True)),
+        version=str(context.get("version", "v2")),
         pulse_count_reference=float(context.get("pulse_count_reference", 128.0)),
         no_hit_reference=float(context.get("no_hit_reference", 5.0)),
     )
@@ -71,27 +70,6 @@ def preprocess_kwargs(payload: dict[str, Any]) -> dict[str, float]:
     }
 
 
-def dqn_kwargs(payload: dict[str, Any]) -> dict[str, Any]:
-    values = dict(payload.get("dqn", {}))
-    allowed = {
-        "hidden_size",
-        "replay_capacity",
-        "batch_size",
-        "gamma",
-        "learning_rate",
-        "target_update_steps",
-        "train_frequency",
-        "epsilon_start",
-        "epsilon_end",
-        "epsilon_decay_steps",
-        "max_revisit_factor",
-        "min_revisit_factor",
-        "uncertainty_weight",
-        "coverage_bonus_weight",
-    }
-    return {key: values[key] for key in allowed if key in values}
-
-
 def linucb_kwargs(payload: dict[str, Any]) -> dict[str, Any]:
     values = dict(payload.get("linucb", {}))
     allowed = {
@@ -103,11 +81,10 @@ def linucb_kwargs(payload: dict[str, Any]) -> dict[str, Any]:
         "coverage_bonus_weight",
         "shared_model",
         "context_version",
-        "predictor_enabled",
         "pulse_count_reference",
         "no_hit_reference",
     }
     result = {key: values[key] for key in allowed if key in values}
     if "max_revisit_factor" not in result:
-        result["max_revisit_factor"] = payload.get("dqn", {}).get("max_revisit_factor", 2.0)
+        result["max_revisit_factor"] = 2.0
     return result

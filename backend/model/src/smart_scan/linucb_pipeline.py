@@ -32,7 +32,6 @@ LINUCB_OPTION_KEYS = {
     "coverage_bonus_weight",
     "shared_model",
     "context_version",
-    "predictor_enabled",
     "pulse_count_reference",
     "no_hit_reference",
 }
@@ -59,6 +58,45 @@ def estimate_pulse_count_reference(
 def _path_signature(paths: Iterable[Path]) -> str:
     payload = json.dumps([str(path) for path in paths], separators=(",", ":"))
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def _file_sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _validate_loaded_options(
+    scheduler: LinUCBScheduler, options: dict[str, Any]
+) -> None:
+    actual = {
+        "alpha": scheduler.alpha,
+        "regularization": scheduler.regularization,
+        "max_revisit_factor": scheduler.max_revisit_factor,
+        "min_revisit_factor": scheduler.min_revisit_factor,
+        "uncertainty_weight": scheduler.uncertainty_weight,
+        "coverage_bonus_weight": scheduler.coverage_bonus_weight,
+        "shared_model": scheduler.shared_model,
+        "context_version": scheduler.context_config.version,
+        "pulse_count_reference": scheduler.context_config.pulse_count_reference,
+        "no_hit_reference": scheduler.context_config.no_hit_reference,
+    }
+    mismatches: list[str] = []
+    for key, expected in options.items():
+        observed = actual[key]
+        if isinstance(expected, (int, float)) and not isinstance(expected, bool):
+            matches = np.isclose(float(observed), float(expected))
+        else:
+            matches = observed == expected
+        if not matches:
+            mismatches.append(f"{key}: checkpoint={observed!r}, requested={expected!r}")
+    if mismatches:
+        raise ValueError(
+            "initial checkpoint does not match the requested LinUCB options: "
+            + "; ".join(mismatches)
+        )
 
 
 def validate_episode_geometry(
@@ -148,6 +186,7 @@ def train_linucb(
     seed: int = 42,
     progress: Callable[[str], None] | None = None,
     resume: bool = True,
+    initial_checkpoint_path: str | Path | None = None,
 ) -> LinUCBScheduler:
     """Train one persistent LinUCB model across all supplied scenarios."""
 
@@ -164,6 +203,14 @@ def train_linucb(
         f"{checkpoint.stem}_training_history.csv"
     )
     metadata_path = checkpoint.with_suffix(".json")
+    initial_checkpoint = (
+        Path(initial_checkpoint_path) if initial_checkpoint_path is not None else None
+    )
+    if initial_checkpoint is not None and not initial_checkpoint.is_file():
+        raise FileNotFoundError(f"initial checkpoint is missing: {initial_checkpoint}")
+    initial_checkpoint_sha256 = (
+        _file_sha256(initial_checkpoint) if initial_checkpoint is not None else None
+    )
     signature = {
         "episode_paths": [str(path) for path in paths],
         "epochs": epochs,
@@ -172,6 +219,10 @@ def train_linucb(
         "reward": asdict(reward),
         "linucb_options": linucb_options,
         "episode_path_sha256": _path_signature(paths),
+        "initial_checkpoint": (
+            str(initial_checkpoint) if initial_checkpoint is not None else None
+        ),
+        "initial_checkpoint_sha256": initial_checkpoint_sha256,
     }
     resumable = (
         resume
@@ -213,11 +264,16 @@ def train_linucb(
                 "incomplete LinUCB resume artifacts found; choose a new output "
                 "directory or pass resume=False"
             )
-        scheduler = LinUCBScheduler(
-            **linucb_options,
-            preserve_model_across_episodes=True,
-            update_enabled=True,
-        )
+        if initial_checkpoint is None:
+            scheduler = LinUCBScheduler(
+                **linucb_options,
+                preserve_model_across_episodes=True,
+                update_enabled=True,
+            )
+        else:
+            scheduler = LinUCBScheduler.load(initial_checkpoint, update_enabled=True)
+            _validate_loaded_options(scheduler, linucb_options)
+            scheduler.preserve_model_across_episodes = True
         training_rows: list[dict[str, float | str | int]] = []
 
     scheduler.artifact_metadata = signature
@@ -407,7 +463,6 @@ def evaluate_frozen_linucb(
                 reward=reward,
                 context=type(scheduler.context_config)(
                     version=scheduler.context_config.version,
-                    predictor_enabled=False,
                     pulse_count_reference=scheduler.context_config.pulse_count_reference,
                     no_hit_reference=scheduler.context_config.no_hit_reference,
                 ),
@@ -566,7 +621,7 @@ def train_validate_select(
         raise ValueError("jobs must be positive")
     geometry = validate_episode_geometry([*train, *validation], configuration)
     base_context = dict(configuration.get("context", {}))
-    context_version = str(base_context.get("version", "v1"))
+    context_version = str(base_context.get("version", "v2"))
     if context_version == "v2":
         configured_reference = base_context.get("pulse_count_reference", "train_p95")
         pulse_reference = (
@@ -579,7 +634,6 @@ def train_validate_select(
         configuration["context"] = base_context
         for candidate in candidates:
             candidate.setdefault("context_version", "v2")
-            candidate.setdefault("predictor_enabled", bool(base_context.get("predictor_enabled", True)))
             candidate.setdefault("pulse_count_reference", pulse_reference)
             candidate.setdefault("no_hit_reference", float(base_context["no_hit_reference"]))
 
@@ -667,81 +721,14 @@ def train_validate_select(
             timing_row["scheduler_deadline_miss_rate"]
         )
 
-    # V2 retains the predictor only when it adds material paired validation
-    # value without sacrificing interception, coverage, or the dwell deadline.
-    core_records = [row for row in records if not row["options"].get("predictor_enabled", True)]
-    selection_diagnostics: dict[str, Any] = {}
-    if context_version == "v2" and core_records:
-        core = max(core_records, key=lambda row: row["validation_average_reward"])
-        predictive = [row for row in records if row["options"].get("predictor_enabled", True)]
-        dwell_s = float(configuration["receiver"]["dwell_ms"]) / 1000.0
-        qualifying: list[dict[str, Any]] = []
-        comparisons: list[dict[str, Any]] = []
-        core_rewards = list(core["validation_reward_by_episode"])
-        required_wins = max(int(np.ceil(0.6 * len(core_rewards))), 1)
-        for row in predictive:
-            wins = sum(
-                candidate_reward > core_reward
-                for candidate_reward, core_reward in zip(
-                    row["validation_reward_by_episode"], core_rewards, strict=True
-                )
-            )
-            improvement = (
-                row["validation_average_reward"] - core["validation_average_reward"]
-            )
-            checks = {
-                "reward_improvement_at_least_0p01": improvement >= 0.01,
-                "paired_episode_wins": wins >= required_wins,
-                "pulse_interception_drop_at_most_0p01": row[
-                    "validation_pulse_interception_ratio"
-                ] >= core["validation_pulse_interception_ratio"] - 0.01,
-                "coverage_drop_at_most_0p02": row[
-                    "validation_unique_emitter_coverage"
-                ] >= core["validation_unique_emitter_coverage"] - 0.02,
-                "decision_p99_within_dwell": row[
-                    "serial_scheduler_decision_p99_s"
-                ] <= dwell_s,
-            }
-            comparison = {
-                "candidate": row["name"],
-                "core": core["name"],
-                "reward_improvement": improvement,
-                "paired_wins": wins,
-                "required_wins": required_wins,
-                "checks": checks,
-                "qualified": all(checks.values()),
-            }
-            comparisons.append(comparison)
-            if comparison["qualified"]:
-                qualifying.append(row)
-        if qualifying:
-            reward_best = max(
-                qualifying, key=lambda row: row["validation_average_reward"]
-            )
-            close_lower_alpha = [
-                row
-                for row in qualifying
-                if reward_best["validation_average_reward"]
-                - row["validation_average_reward"]
-                < 0.01
-            ]
-            best = min(close_lower_alpha, key=lambda row: float(row["options"]["alpha"]))
-        else:
-            best = core
-        selection_diagnostics = {
-            "core_candidate": core["name"],
-            "predictor_gate": comparisons,
-            "predictor_retained": bool(best["options"].get("predictor_enabled", True)),
-        }
-    else:
-        best = max(
-            records,
-            key=lambda row: (
-                row["validation_average_reward"],
-                row["validation_pulse_interception_ratio"],
-                -row["validation_first_intercept_delay_s"],
-            ),
-        )
+    best = max(
+        records,
+        key=lambda row: (
+            row["validation_average_reward"],
+            row["validation_pulse_interception_ratio"],
+            -row["validation_first_intercept_delay_s"],
+        ),
+    )
     frozen_checkpoint = output / "frozen_linucb.npz"
     shutil.copy2(best["checkpoint"], frozen_checkpoint)
     source_metadata = Path(best["checkpoint"]).with_suffix(".json")
@@ -768,7 +755,6 @@ def train_validate_select(
     if context_version == "v2":
         frozen_configuration["context"] = {
             "version": "v2",
-            "predictor_enabled": bool(best["options"]["predictor_enabled"]),
             "pulse_count_reference": float(best["options"]["pulse_count_reference"]),
             "no_hit_reference": float(best["options"]["no_hit_reference"]),
         }
@@ -797,10 +783,8 @@ def train_validate_select(
     )
     selection = {
         "selection_rule": (
-            "V2 predictor gate: reward improvement >=0.01, wins >=60% of paired "
-            "validation scenarios, pulse drop <=0.01, coverage drop <=0.02, and "
-            "decision p99 <= dwell; otherwise select core. Within 0.01 reward, "
-            "prefer lower alpha. V1 uses reward with interception/delay tie-breaks."
+            "Maximize validation reward, then pulse interception ratio, then "
+            "minimize first-intercept delay."
         ),
         "train_episode_count": len(train),
         "validation_episode_count": len(validation),
@@ -819,7 +803,6 @@ def train_validate_select(
         "training_episode_path_sha256": _path_signature(train),
         "validation_episode_path_sha256": _path_signature(validation),
         "context": base_context,
-        "selection_diagnostics": selection_diagnostics,
         "episode_geometry": geometry,
     }
     (output / "selection.json").write_text(

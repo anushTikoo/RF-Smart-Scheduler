@@ -3,15 +3,15 @@ from __future__ import annotations
 import pytest
 
 from smart_scan.data.synthetic import make_synthetic_episode
-from smart_scan.evaluation.run import run_episode
-from smart_scan.schedulers.baselines import OracleScheduler, RoundRobinScheduler
+from smart_scan.evaluation.run import run_episode, scheduler_factories
+from smart_scan.schedulers.baselines import RoundRobinScheduler
 from smart_scan.schedulers.base import coverage_urgency, revisit_candidate_mask
 from smart_scan.schedulers.linucb import LinUCBScheduler
 
 
 @pytest.mark.parametrize(
     "scheduler",
-    [RoundRobinScheduler(), LinUCBScheduler(alpha=0.5), OracleScheduler()],
+    [RoundRobinScheduler(), LinUCBScheduler(alpha=0.5)],
 )
 def test_scheduler_completes_episode(scheduler) -> None:
     episode = make_synthetic_episode(num_steps=40, num_bands=5, num_emitters=4)
@@ -20,11 +20,8 @@ def test_scheduler_completes_episode(scheduler) -> None:
     assert 0.0 <= result["emitter_event_interception_ratio"] <= 1.0
 
 
-def test_oracle_reward_is_at_least_round_robin() -> None:
-    episode = make_synthetic_episode(num_steps=100, num_bands=6, num_emitters=5)
-    oracle = run_episode(episode, OracleScheduler(), seed=1)
-    round_robin = run_episode(episode, RoundRobinScheduler(), seed=1)
-    assert oracle["total_reward"] >= round_robin["total_reward"]
+def test_only_final_schedulers_are_exposed() -> None:
+    assert set(scheduler_factories()) == {"round_robin", "linucb"}
 
 
 def test_adaptive_guard_shortens_deadline_for_active_band() -> None:

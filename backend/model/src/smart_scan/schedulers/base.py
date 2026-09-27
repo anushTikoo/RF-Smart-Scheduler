@@ -9,8 +9,7 @@ from smart_scan.env.scan_env import ScanEnvironment, Transition
 
 class Scheduler(ABC):
     name = "scheduler"
-    # DQN consumes flattened state vectors. LinUCB and the baseline schedulers
-    # operate directly on the environment and should not pay to build them.
+    # Current schedulers operate directly on causal environment observations.
     requires_state_vector = False
 
     def reset(self, env: ScanEnvironment, seed: int = 0) -> None:
@@ -41,7 +40,7 @@ def revisit_candidate_mask(
     """Mask bands that must be considered to maintain the revisit guarantee.
 
     Supplying ``min_revisit_factor`` enables activity-aware deadlines. Bands with
-    observed/predicted activity or high uncertainty get a shorter deadline;
+    observed activity, learned periodicity, or high uncertainty get a shorter deadline;
     repeatedly inactive bands may wait up to ``max_revisit_factor`` sweeps.
     """
 
@@ -62,13 +61,11 @@ def revisit_candidate_mask(
         raise ValueError("min_revisit_factor must be positive and no greater than max")
     if uncertainty_weight < 0:
         raise ValueError("uncertainty_weight cannot be negative")
-    prediction = env.prediction_scores()
     uncertainty = 1.0 / np.sqrt(1.0 + env.visit_count.astype(np.float64))
     interest = np.maximum.reduce(
         [
             env.ewma_hit.astype(np.float64),
             env._periodic_due().astype(np.float64),
-            prediction.astype(np.float64),
             np.clip(uncertainty_weight * uncertainty, 0.0, 1.0),
         ]
     )
@@ -103,13 +100,11 @@ def coverage_urgency(
             dtype=np.float64,
         )
     else:
-        prediction = env.prediction_scores()
         uncertainty = 1.0 / np.sqrt(1.0 + env.visit_count.astype(np.float64))
         interest = np.maximum.reduce(
             [
                 env.ewma_hit.astype(np.float64),
                 env._periodic_due().astype(np.float64),
-                prediction.astype(np.float64),
                 np.clip(uncertainty_weight * uncertainty, 0.0, 1.0),
             ]
         )

@@ -1,103 +1,62 @@
-# Persistent LinUCB Training Pipeline
+# Final LinUCB training pipeline
 
-## Data boundary
-
-```text
-30 train scenarios -> update LinUCB -> save candidate checkpoint
-10 validation scenarios -> frozen evaluation -> select hyperparameters
-freeze checkpoint and configuration
-10 fresh test scenarios -> frozen evaluation once
-```
-
-The train/validation selector reads only `scaled_train_val.json`. It has no test-manifest argument and records `test_data_accessed: false` in `selection.json`. The final evaluator is a separate command using `scaled_fresh_test_holdout.json`.
-
-## No emitter intelligence in the scheduler
-
-The scheduler is designed for the absence of emitter identity and operating-characteristic intelligence. LinUCB does not receive dataset emitter labels, threat class, emitter PRI, scan pattern, or future frequency schedule. One shared linear model is used for every band, so training learns general observable activity rules instead of maintaining a memorized model for each absolute frequency.
-
-Its context contains only quantities derived from the receiver's own past observations:
-
-- normalized frequency-band index;
-- time since the band was observed;
-- exponentially weighted hit history;
-- last observed pulse count and amplitude;
-- consecutive no-hit observations;
-- band-level periodicity inferred from observed hits;
-- anonymous per-band activity prediction inferred from observed pulse times;
-- normalized retune distance;
-- coverage/visit uncertainty;
-- episode time features.
-
-The anonymous pulse predictor groups observations by receiver band, not emitter ID. Multiple emitters in one band are intentionally treated as a single anonymous activity stream.
-
-Dataset labels remain in the simulator for offline acquisition-delay reward and evaluation metrics. During validation and test the loaded checkpoint has `update_enabled=False`, so oracle reward and labels cannot modify the policy. An operational integration should replace evaluation labels with a real tracker only if emitter-specific reporting is required; LinUCB scheduling itself does not require that tracker.
-
-## What persists
-
-The selected shared LinUCB model saves:
-
-- one inverse design matrix `A_inverse`, shared by all frequency-band arms;
-- one reward vector `b`, shared by all frequency-band arms;
-- alpha and regularization;
-- adaptive revisit and coverage settings;
-- context dimensions and update count.
-
-Calling `reset()` for a new training episode clears episode-local action context while retaining these learned statistics. A frozen checkpoint can be loaded without enabling online updates.
-
-## Training diagnostics
-
-LinUCB updates its linear sufficient statistics analytically and therefore has no neural-network optimization loss. The implementation logs contextual reward-prediction mean squared error as the loss-like diagnostic:
+## Training flow
 
 ```text
-reward_prediction_mse = mean((observed_reward - predicted_reward)^2)
+100 train scenarios
+        ↓ continuous LinUCB updates
+frozen 100-scenario checkpoint
+        ↓ continue on 100 new train scenarios
+frozen 200-scenario checkpoint
+        ↓ no online updates
+100 validation scenarios
+        ↓
+Round Robin versus LinUCB figures of merit
 ```
 
-For every training scenario it records average reward, prediction MSE, five-scenario rolling reward/MSE, cumulative updates, interception ratios, coverage, delay, and miss rate. The selected candidate's complete history is copied to:
+Training state persists across scenarios. The second 100-scenario stage starts from the learned sufficient statistics of the first checkpoint rather than restarting the model.
 
-```text
-outputs/linucb_pipeline/frozen_training_history.csv
-outputs/linucb_pipeline/frozen_training_history.json
-```
+## What the checkpoint contains
 
-Because scenarios contain different emitters and activity densities, raw per-scenario reward is not expected to increase monotonically. Rolling metrics and frozen validation performance are the meaningful trend checks.
+The `.npz` checkpoint stores the LinUCB inverse covariance matrices, reward vectors, update count, feature metadata, environment geometry, context settings, and training provenance. Loading the frozen artifact defaults to `update_enabled=False`.
 
-## Inference band trace
+The accompanying bundle contains:
 
-Candidate-screening validation skips action traces and evaluates only LinUCB. Once the best candidate is selected, a single full validation comparison writes one CSV row for every LinUCB and round-robin decision under `outputs/linucb_pipeline/selected_validation/traces`. Final test runs write the same traces under their own `traces` directory. Rows include step/time, band index, lower and upper frequency, pulse interceptions, miss and false-alarm flags, total reward and each reward component, and switching distance.
+- frozen checkpoint;
+- frozen YAML configuration;
+- combined 200-scenario manifest;
+- CSV and JSON training histories;
+- model metadata;
+- SHA-256 checksums.
 
-The final-test script prints the active LinUCB band every 100 decisions by default:
+## Learning diagnostics
 
-```powershell
-.venv\Scripts\python scripts/linucb_final_test.py --band-log-interval 100
-```
+LinUCB uses analytical updates and therefore has no neural-network training loss. The logged reward-prediction MSE is the loss-like diagnostic. Per-scenario rewards are not expected to rise monotonically because each file contains a different RF environment. Fixed validation comparisons are the primary evidence of generalisation.
 
-Use `--band-log-interval 1` for every decision or `0` to disable console band logging. Full CSV traces are produced independently of the console interval.
+## No prior emitter intelligence
 
-## Hyperparameter selection
+LinUCB never receives emitter identity, class, PRI, scan pattern, or future frequency activity. It learns transferable relationships between causal observation history and received reward. Dataset labels remain simulator truth only for delay, coverage, and reward bookkeeping.
 
-`configs/linucb_search.yaml` declares three exploration candidates:
+## Inference and baseline comparison
 
-- exploration strength (`alpha`);
-- balanced exploration (`alpha=1.0`);
-- lower exploration (`alpha=0.5`);
-- higher exploration (`alpha=1.5`).
+The final evaluator loads the frozen model, keeps online updates disabled, and runs exactly two policies on identical episodes:
 
-Regularization, coverage, revisit and uncertainty settings are held fixed so the three-candidate comparison remains interpretable. Each candidate is independently trained on all 30 training scenarios. Validation selection uses highest mean reward, then pulse interception and lower first-intercept delay only as deterministic tie-breakers. Test data is not used for candidate selection.
+- Round Robin;
+- LinUCB with adaptive coverage constraints.
 
-The three candidates run in separate worker processes by default, but training order remains sequential within each candidate. LinUCB feature calculations are cached for the current dwell and vectorized across all bands. State vectors used only by DQN are not built on the LinUCB path.
-
-A compatible checkpoint, JSON history and CSV history are saved after every scenario. If a run is interrupted, rerunning the same command resumes from the last completed scenario. Resume is rejected if the paths, seed, receiver, reward or LinUCB options changed.
+Per-dwell traces include selected band, frequency interval, detections, missed opportunities, reward components, and decision timing. Aggregate output contains confidence intervals and the full figures-of-merit table.
 
 ## Commands
 
 ```powershell
-& ".\.venv\Scripts\python.exe" ".\scripts\linucb_train_validate.py" --jobs 3
+& ".\scripts\setup_v2_production_data.ps1"
+& ".\.venv\Scripts\python.exe" ".\scripts\v2_train_production.py"
+& ".\scripts\setup_v2_additional_100.ps1"
+& ".\.venv\Scripts\python.exe" ".\scripts\v2_continue_to_200.py"
 ```
 
-After selection is complete and frozen, download/preprocess the sealed scenarios and run:
+Evaluate a declared split with the frozen 200-scenario checkpoint:
 
 ```powershell
-.venv\Scripts\python scripts/linucb_final_test.py
+& ".\.venv\Scripts\python.exe" ".\scripts\v2_final_test.py" --split test
 ```
-
-The final evaluator compares only round-robin and frozen LinUCB and writes per-episode results, a bootstrap aggregate, figures of merit, and a protocol record.

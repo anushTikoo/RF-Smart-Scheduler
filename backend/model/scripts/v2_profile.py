@@ -19,14 +19,12 @@ def main() -> int:
         default=Path("data/processed_v2_20bands_500us/stare/train/config_0.npz"),
     )
     parser.add_argument("--steps", type=int, default=5000)
-    parser.add_argument("--predictor", action="store_true")
     args = parser.parse_args()
     episode = Episode.load(args.episode)
     env = ScanEnvironment(episode)
     scheduler = LinUCBScheduler(
         shared_model=True,
         context_version="v2",
-        predictor_enabled=args.predictor,
         pulse_count_reference=21.0,
         min_revisit_factor=0.5,
         max_revisit_factor=3.0,

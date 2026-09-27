@@ -1,0 +1,16 @@
+{
+  "dataset_id": "alan-turing-institute/turing-synthetic-radar-dataset",
+  "description": "Sealed evaluation set for V2.1 after continuation to 200 stare training scenarios. Never use for training or tuning.",
+  "files": [
+    {"split": "test", "mode": "stare", "config_id": 47},
+    {"split": "test", "mode": "stare", "config_id": 48},
+    {"split": "test", "mode": "stare", "config_id": 49},
+    {"split": "test", "mode": "stare", "config_id": 50},
+    {"split": "test", "mode": "stare", "config_id": 51},
+    {"split": "test", "mode": "stare", "config_id": 52},
+    {"split": "test", "mode": "stare", "config_id": 53},
+    {"split": "test", "mode": "stare", "config_id": 54},
+    {"split": "test", "mode": "stare", "config_id": 55},
+    {"split": "test", "mode": "stare", "config_id": 56}
+  ]
+}

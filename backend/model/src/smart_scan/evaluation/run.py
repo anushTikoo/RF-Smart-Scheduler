@@ -12,13 +12,7 @@ from smart_scan.data.episode import Episode
 from smart_scan.env.scan_env import ReceiverConfig, RewardConfig, ScanEnvironment
 from smart_scan.features.context import BandContextConfig
 from smart_scan.schedulers.base import Scheduler
-from smart_scan.schedulers.baselines import (
-    GreedyScheduler,
-    OracleScheduler,
-    PeriodicScheduler,
-    RandomScheduler,
-    RoundRobinScheduler,
-)
+from smart_scan.schedulers.baselines import RoundRobinScheduler
 from smart_scan.schedulers.linucb import LinUCBScheduler
 
 METRICS = [
@@ -45,14 +39,6 @@ METRICS = [
     "pulses_lost_to_latency",
     "receiver_dead_time_s",
     "oracle_band_accuracy",
-    "intercept_time_prediction_mae_s",
-    "next_pulse_band_accuracy",
-    "next_pulse_prediction_count",
-    "next_active_dwell_timing_mae_s",
-    "next_active_band_accuracy",
-    "next_active_prediction_count",
-    "next_active_prediction_coverage",
-    "predictor_dwell_updates",
     "scheduler_decision_mean_s",
     "scheduler_decision_p95_s",
     "scheduler_decision_p99_s",
@@ -62,29 +48,13 @@ METRICS = [
 
 
 def scheduler_factories(
-    dqn_model: str | Path | None = None,
     *,
-    dqn_options: dict | None = None,
     linucb_options: dict | None = None,
 ) -> dict[str, Callable[[], Scheduler]]:
-    factories: dict[str, Callable[[], Scheduler]] = {
+    return {
         "round_robin": RoundRobinScheduler,
-        "random": RandomScheduler,
-        "greedy": GreedyScheduler,
-        "periodic": PeriodicScheduler,
         "linucb": lambda: LinUCBScheduler(**(linucb_options or {})),
-        "oracle": OracleScheduler,
     }
-    if dqn_model is not None:
-        try:
-            from smart_scan.schedulers.dqn import DQNScheduler
-
-            factories["dqn"] = lambda: DQNScheduler(
-                training=False, model_path=dqn_model, **(dqn_options or {})
-            )
-        except (ImportError, RuntimeError):
-            pass
-    return factories
 
 
 def run_episode(
@@ -172,33 +142,25 @@ def benchmark(
     scheduler_names: list[str],
     *,
     seeds: int = 3,
-    dqn_model: str | Path | None = None,
     receiver: ReceiverConfig | None = None,
     reward: RewardConfig | None = None,
-    dqn_options: dict | None = None,
     linucb_options: dict | None = None,
 ) -> list[dict[str, float | str | int]]:
-    factories = scheduler_factories(
-        dqn_model=dqn_model,
-        dqn_options=dqn_options,
-        linucb_options=linucb_options,
-    )
+    factories = scheduler_factories(linucb_options=linucb_options)
     unknown = sorted(set(scheduler_names) - set(factories))
     if unknown:
         raise ValueError(f"unknown or unavailable schedulers: {unknown}")
     rows: list[dict[str, float | str | int]] = []
     for name in scheduler_names:
-        runs = seeds if name in {"random", "greedy", "periodic"} else 1
-        for seed in range(runs):
-            rows.append(
-                run_episode(
-                    episode,
-                    factories[name](),
-                    seed=seed,
-                    receiver=receiver,
-                    reward=reward,
-                )
+        rows.append(
+            run_episode(
+                episode,
+                factories[name](),
+                seed=0,
+                receiver=receiver,
+                reward=reward,
             )
+        )
     return rows
 
 

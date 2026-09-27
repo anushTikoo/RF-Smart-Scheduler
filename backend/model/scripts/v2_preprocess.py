@@ -21,7 +21,7 @@ def main() -> int:
         "--output", type=Path, default=Path("data/processed_v2_20bands_500us")
     )
     parser.add_argument(
-        "--config", type=Path, default=Path("configs/v2_20bands_500us.yaml")
+        "--config", type=Path, default=Path("configs/v2_production_core.yaml")
     )
     args = parser.parse_args()
 
@@ -53,4 +53,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

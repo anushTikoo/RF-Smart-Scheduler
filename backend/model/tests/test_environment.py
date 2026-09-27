@@ -24,17 +24,6 @@ def _dense_episode(pulse_count: np.ndarray, emitter_presence: np.ndarray) -> Epi
     )
 
 
-def test_environment_exposes_fixed_state_and_context_shapes() -> None:
-    episode = make_synthetic_episode(num_steps=30, num_bands=6, num_emitters=3)
-    env = ScanEnvironment(episode, seed=1)
-    state = env.reset()
-    assert state.shape == (6 * 11 + 6 + 2,)
-    assert env.band_contexts().shape == (6, 12)
-    transition = env.step(2)
-    assert isinstance(transition.reward, float)
-    assert env.step_index == 1
-
-
 def test_environment_only_detects_selected_band() -> None:
     episode = make_synthetic_episode(num_steps=20, num_bands=4, num_emitters=2)
     env = ScanEnvironment(episode, seed=0)
@@ -164,7 +153,7 @@ def test_v2_context_is_causal_band_invariant_and_compact() -> None:
     episode = make_synthetic_episode(num_steps=30, num_bands=20, num_emitters=3)
     env = ScanEnvironment(
         episode,
-        context=BandContextConfig(version="v2", predictor_enabled=False),
+        context=BandContextConfig(version="v2"),
     )
     contexts = env.band_contexts()
     assert contexts.shape == (20, 6)
@@ -178,7 +167,6 @@ def test_v2_context_is_causal_band_invariant_and_compact() -> None:
     )
     # With no observations, absolute band number must not change the context.
     assert np.allclose(contexts, contexts[0])
-    assert env.next_pulse_predictor is None
 
 
 def test_missed_opportunity_penalty_is_time_normalized() -> None:
@@ -213,9 +201,7 @@ def test_zero_latency_never_loses_boundary_pulse() -> None:
 
 def test_v2_context_is_equivariant_to_band_permutation() -> None:
     episode = make_synthetic_episode(num_steps=20, num_bands=5, num_emitters=2)
-    config = BandContextConfig(
-        version="v2", predictor_enabled=False, pulse_count_reference=10.0
-    )
+    config = BandContextConfig(version="v2", pulse_count_reference=10.0)
     original = ScanEnvironment(episode, context=config)
     original.last_visit[:] = np.asarray([0, 1, 2, 3, 4])
     original.step_index = 8

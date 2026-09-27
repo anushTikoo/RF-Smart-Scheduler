@@ -6,7 +6,6 @@ from pathlib import Path
 
 from smart_scan.config import (
     DEFAULT_CONFIG_PATH,
-    dqn_kwargs,
     linucb_kwargs,
     load_config,
     preprocess_kwargs,
@@ -22,7 +21,6 @@ from smart_scan.data.split_integrity import validate_split_manifests
 from smart_scan.evaluation.aggregate import aggregate_result_files, save_aggregate
 from smart_scan.evaluation.fom import load_and_save_figures_of_merit
 from smart_scan.evaluation.run import benchmark, save_results, scheduler_factories, summarize
-from smart_scan.training import train_dqn
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -62,7 +60,6 @@ def build_parser() -> argparse.ArgumentParser:
     bench.add_argument("--scheduler", action="append", default=[])
     bench.add_argument("--seeds", type=int, default=3)
     bench.add_argument("--output", type=Path, default=Path("outputs/benchmark.json"))
-    bench.add_argument("--dqn-model", type=Path)
     bench.add_argument("--config", type=Path, default=DEFAULT_CONFIG_PATH)
 
     aggregate = commands.add_parser(
@@ -79,12 +76,6 @@ def build_parser() -> argparse.ArgumentParser:
     fom.add_argument("--aggregate", type=Path, required=True)
     fom.add_argument("--output", type=Path, default=Path("outputs/figures_of_merit.json"))
 
-    training = commands.add_parser("train-dqn", help="train DQN on processed episodes")
-    training.add_argument("episodes", nargs="+", type=Path)
-    training.add_argument("--epochs", type=int, default=3)
-    training.add_argument("--seed", type=int, default=42)
-    training.add_argument("--output", type=Path, default=Path("outputs/models/dqn.pt"))
-    training.add_argument("--config", type=Path, default=DEFAULT_CONFIG_PATH)
     return parser
 
 
@@ -125,43 +116,23 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if args.command == "benchmark":
         configuration = load_config(args.config)
-        dqn_options = dqn_kwargs(configuration)
         linucb_options = linucb_kwargs(configuration)
         episode = Episode.load(args.episode)
         names = args.scheduler
         if not names or "all" in names:
             names = list(
-                scheduler_factories(
-                    dqn_model=args.dqn_model,
-                    dqn_options=dqn_options,
-                    linucb_options=linucb_options,
-                )
+                scheduler_factories(linucb_options=linucb_options)
             )
         rows = benchmark(
             episode,
             names,
             seeds=args.seeds,
-            dqn_model=args.dqn_model,
             receiver=receiver_config(configuration),
             reward=reward_config(configuration),
-            dqn_options=dqn_options,
             linucb_options=linucb_options,
         )
         save_results(rows, args.output)
         print(json.dumps(summarize(rows), indent=2))
-        return 0
-    if args.command == "train-dqn":
-        configuration = load_config(args.config)
-        train_dqn(
-            args.episodes,
-            epochs=args.epochs,
-            seed=args.seed,
-            output_path=args.output,
-            receiver=receiver_config(configuration),
-            reward=reward_config(configuration),
-            dqn_options=dqn_kwargs(configuration),
-        )
-        print(args.output)
         return 0
     if args.command == "aggregate":
         payload = aggregate_result_files(

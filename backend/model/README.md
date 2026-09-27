@@ -1,175 +1,92 @@
 # Smart Scan Strategy for Electronic Warfare
 
-Model-only research prototype for learning a narrowband receiver scan policy from radar Pulse Descriptor Words (PDWs).
+Model-only research implementation of an adaptive narrowband receiver scheduler for unknown radar emitters.
 
-## V2 (active model)
+## Final scope
 
-The active V2 experiment uses 20 bands over 500–18,000 MHz, a 500 us dwell,
-and a 10 ms round-robin sweep. It compares only round-robin and a persistent
-shared LinUCB contextual bandit. DQN and the other heuristic schedulers are
-legacy research code and are not part of V2 training, selection, or reporting.
+The repository intentionally contains two schedulers only:
 
-V2 removes absolute band position, mission phase, amplitude, switching distance,
-and emitter identity from the model context. See `V2_MODEL_PROTOCOL.md` for the
-frozen feature, reward, leakage, selection, metric, and execution specification.
+- `RoundRobinScheduler`: deterministic open-loop baseline.
+- `LinUCBScheduler`: the selected contextual-bandit policy with adaptive coverage constraints.
 
-The system treats stare-mode recordings from the Turing Synthetic Radar Dataset as oracle environmental truth. The V2 simulated receiver observes one 875 MHz band per dwell. The active experiment compares a contextual-bandit LinUCB scheduler with round-robin. The earlier DQN implementation remains only as legacy research code; it is not imported, trained, or evaluated by the V2 pipeline.
+The selected model was trained continuously on 200 complete `train_stare` scenarios and then frozen. It does not receive emitter identity, class, PRI, scan pattern, future activity, or other prior emitter intelligence.
 
-The cache keeps both time-band aggregates and exact pulse times. Exact events are used for amplitude thresholding and configurable decision/retune/settling latency. The 500 us dwell is a continuous listening interval and scheduling time step; it is not a claim that one receiver can retune between arbitrary pulses a few microseconds apart. V2 records scheduler p99 latency and deadline misses explicitly.
+Receiver simulation assumptions:
 
-The active LinUCB scheduler requires no emitter identity, emitter class, PRI, scan pattern, or pre-mission frequency plan. Its context is built only from receiver-observable per-band history: visit recency, hit EWMA, log pulse count, consecutive no-hit observations, learned periodicity, and optionally anonymous next-active-dwell urgency. Dataset emitter labels remain simulator truth for offline reward and evaluation only. Frozen validation/test inference does not update from oracle rewards.
+- spectrum: 500–18,000 MHz;
+- 20 non-overlapping bands of 875 MHz;
+- 500 us dwell, giving a 10 ms Round Robin sweep;
+- ideal initial detector with `Pd=1`, `Pfa=0`, and −120 dB sensitivity;
+- zero configured decision, retune, and settling latency.
+
+The causal LinUCB context uses bias, visit recency, observed hit EWMA, prior observed pulse count, consecutive no-hit history, and learned periodicity. No next-pulse or intercept-time predictor is part of the model. LinUCB explores with its confidence bound and coverage constraint; it does not use epsilon-greedy exploration.
+
+## Frozen backend artifact
+
+The selected checkpoint is:
+
+```text
+outputs/v2_production_200/frozen_model/smart_scan_linucb_v2_1_200.npz
+```
+
+Its configuration and complete training provenance are in the same directory. The portable archive is:
+
+```text
+artifacts/smart_scan_linucb_v2_1_200_scenarios.zip
+```
+
+See `FINAL_MODEL_REPORT.md` for the complete 100-scenario validation comparison with Round Robin.
 
 ## Setup
 
 ```powershell
 py -m venv .venv
 & ".\.venv\Scripts\python.exe" -m pip install -e ".[dev]"
+& ".\.venv\Scripts\python.exe" -m pytest
 ```
 
-The repository intentionally does not contain the raw HDF5 dataset or generated NPZ caches. They are large, gated artifacts and are excluded by `.gitignore`.
+## Reproduce the 200-scenario model
 
-## Reproduce the training data on a new computer
-
-First accept the dataset conditions on Hugging Face and create a read token. Then run the secure setup helper from the repository root:
+Download and preprocess the first 100 training scenarios:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File ".\scripts\setup_training_data.ps1"
+& ".\scripts\setup_v2_production_data.ps1"
 ```
 
-The helper hides the token while it is entered, exposes it only to the download process, and removes it afterward. It downloads exactly the 30 training and 10 validation files declared in `scaled_train_val.json`, audits them, and creates the processed episodes under `data/processed`.
-
-After data preparation, preprocess and train V2:
+Train and freeze the first-stage model:
 
 ```powershell
-& ".\.venv\Scripts\python.exe" ".\scripts\v2_preprocess.py"
-& ".\.venv\Scripts\python.exe" ".\scripts\v2_train_validate.py" --jobs 3
+& ".\.venv\Scripts\python.exe" ".\scripts\v2_train_production.py"
 ```
 
-Do not place a Hugging Face token in source files or commit it. After accepting the gated dataset conditions, either configure it only in the current shell:
+Download and preprocess training scenarios 100–199, then continue training and export the final frozen model:
 
 ```powershell
-$env:HF_TOKEN = "your-token"
+& ".\scripts\setup_v2_additional_100.ps1"
+& ".\.venv\Scripts\python.exe" ".\scripts\v2_continue_to_200.py"
 ```
 
-or use the secure helper, which hides the input and removes the token from the process after downloading:
+## Evaluate one HDF5 scenario
+
+This evaluates both the frozen contextual bandit and Round Robin and writes all figures of merit:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File scripts/download_micro_dataset.ps1
+& ".\.venv\Scripts\python.exe" ".\scripts\v2_evaluate_h5.py" `
+  "C:\path\to\config.h5"
 ```
 
-## Legacy V1/DQN research code
+## Evaluate a declared validation or test split
 
-The commands and files below are retained only to reproduce older experiments.
-They are not part of the V2 model decision.
-
-### Verify without external data
+`v2_final_test.py` loads the frozen model with online updates disabled and compares only LinUCB and Round Robin:
 
 ```powershell
-smart-scan synthetic --output data/processed/synthetic_episode.npz
-smart-scan train-dqn data/processed/synthetic_episode.npz --epochs 2 --output outputs/models/dqn-smoke.pt
-smart-scan benchmark --episode data/processed/synthetic_episode.npz --scheduler all --dqn-model outputs/models/dqn-smoke.pt --seeds 3
-pytest
+& ".\.venv\Scripts\python.exe" ".\scripts\v2_final_test.py" `
+  --split test `
+  --band-log-interval 1000
 ```
 
-## Download the micro-dataset
+Use `--no-traces` for large runs when per-dwell CSV logs are unnecessary. The evaluator writes per-episode results, bootstrap aggregates, figures of merit, and a protocol record.
 
-The checked-in manifest requests only 12 explicit HDF5 files.
+## Interpretation limits
 
-```powershell
-smart-scan download --manifest data/manifests/micro.json --output data/raw
-smart-scan audit --manifest data/manifests/micro.json --raw data/raw --output outputs/data_audit.json
-smart-scan preprocess --manifest data/manifests/micro.json --raw data/raw --output data/processed --config configs/micro.yaml
-```
-
-Train only on the official training episodes and evaluate candidate checkpoints on validation episodes:
-
-```powershell
-$train = (Get-ChildItem data/processed/stare/train/*.npz).FullName
-smart-scan train-dqn $train --epochs 1 --seed 42 --config configs/micro.yaml --output outputs/models/dqn.pt
-smart-scan benchmark --episode data/processed/stare/val/config_0.npz --scheduler round_robin --scheduler linucb --scheduler dqn --dqn-model outputs/models/dqn.pt --config configs/micro.yaml --output outputs/validation.json
-```
-
-After model selection is frozen, download the untouched final holdout without changing its manifest:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File scripts/download_micro_dataset.ps1 `
-  -Manifest data/manifests/final_holdout.json `
-  -RawDirectory data/raw
-```
-
-The current model is a research simulator, not an operational EW receiver. Probability of detection and false alarms are controlled simulation parameters because this PDW dataset does not contain raw RF/IQ noise from which hardware detector performance can be measured.
-
-The scheduler reward is:
-
-```text
-R_t = 0.01 * intercepted pulses
-    - 1.00 * undetected-emitter acquisition-delay seconds
-    - 0.10 * miss
-```
-
-A miss means a real, threshold-eligible emission occurred somewhere during the dwell but the receiver intercepted no pulse. It is distinct from a false alarm. The default ideal detector has zero false alarms by construction, so false alarms are measured but not penalized. See [REWARD_FUNCTION.md](REWARD_FUNCTION.md) for the exact definitions and limitations.
-
-## Scaled experiment
-
-The frozen scaled split contains 30 official training files, 10 official validation files, and 10 untouched official test files. Test IDs 0–6 were consumed by earlier development and are excluded from the new holdout.
-
-```powershell
-smart-scan check-splits data/manifests/scaled_train_val.json data/manifests/scaled_test_holdout.json
-powershell -ExecutionPolicy Bypass -File scripts/download_micro_dataset.ps1 `
-  -Manifest data/manifests/scaled_train_val.json `
-  -RawDirectory data/raw
-smart-scan audit --manifest data/manifests/scaled_train_val.json --raw data/raw --output outputs/scaled_data_audit.json
-smart-scan preprocess --manifest data/manifests/scaled_train_val.json --raw data/raw --output data/processed --config configs/scaled.yaml
-```
-
-Do not download, preprocess, inspect, or evaluate `scaled_test_holdout.json` until the scheduler configuration and DQN checkpoint have been selected using validation data.
-
-The scaled configuration enables activity-aware revisit deadlines and a coverage-urgency bonus. It retains an initial full-band visit and a hard deadline guard, while allowing repeatedly inactive bands to wait longer and active, uncertain, or pulse-due bands to be revisited sooner.
-
-Emitter labels are retained in processed episode caches because they are required to score unique-emitter coverage, first-intercept delay, and emitter-event interception. Labels are local to each scenario and are evaluator/reward-only: they are never placed in the scheduler state, contextual-bandit context, or DQN input.
-
-## Persistent LinUCB train/validation/test pipeline
-
-Train every candidate continuously across all 30 training scenarios, evaluate the resulting frozen checkpoints on the 10 validation scenarios, and freeze the best validation configuration. The three independent candidates run in parallel by default; scenario order inside each candidate remains sequential:
-
-```powershell
-& ".\.venv\Scripts\python.exe" ".\scripts\linucb_train_validate.py" --jobs 3
-```
-
-The compact three-candidate search is declared in `configs/linucb_search.yaml`. Selection maximizes validation reward, with pulse interception and lower first-intercept delay used only as tie-breakers. A resumable checkpoint is written after every completed training scenario. Rerunning the same command resumes only if the scenario list, seed, receiver, reward and model settings match; use `--no-resume` or a new output directory to start over. The command produces:
-
-- `outputs/linucb_pipeline/frozen_linucb.npz`
-- `outputs/linucb_pipeline/frozen_config.yaml`
-- `outputs/linucb_pipeline/selection.json`
-- `outputs/linucb_pipeline/frozen_training_history.csv`
-- `outputs/linucb_pipeline/frozen_training_history.json`
-
-During training, the terminal reports each scenario's average reward, contextual reward-prediction MSE, and five-scenario rolling values. LinUCB is a closed-form contextual bandit rather than a neural network, so reward-prediction MSE is the relevant loss-like diagnostic. Scenario rewards need not increase monotonically because each file contains a different RF environment; use the rolling series and validation results to judge learning.
-
-Candidate screening evaluates only frozen LinUCB and does not write large action traces. After selection, round-robin is evaluated once and detailed traces for both schedulers are written under `outputs/linucb_pipeline/selected_validation/traces`. This avoids repeating the identical round-robin baseline for every candidate.
-
-Only after those files are frozen, download and preprocess the new sealed test scenarios 17–26:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File scripts/download_micro_dataset.ps1 `
-  -Manifest data/manifests/scaled_fresh_test_holdout.json `
-  -RawDirectory data/raw
-smart-scan preprocess `
-  --manifest data/manifests/scaled_fresh_test_holdout.json `
-  --raw data/raw `
-  --output data/processed `
-  --config outputs/linucb_pipeline/frozen_config.yaml
-.venv\Scripts\python scripts/linucb_final_test.py
-```
-
-The final-test command loads the frozen checkpoint with online updates disabled and compares only round-robin and LinUCB. See `LINUCB_TRAINING_PIPELINE.md` for the data-boundary and checkpoint details.
-
-Every inference decision is written to CSV under `outputs/linucb_pipeline/final_test/traces`. Each row contains time, selected band, exact frequency range, detected pulse count, miss/false-alarm flags, reward components, and switching distance. The final-test command also prints the selected LinUCB band every 100 decisions by default; change this with `--band-log-interval`.
-
-Generate the named interception figures of merit from an aggregate result:
-
-```powershell
-smart-scan fom-report --aggregate outputs/scaled/aggregate.json --output outputs/scaled/figures_of_merit.json
-```
-
-See [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) for scope, metrics, milestones, and acceptance gates.
+Stare-mode PDWs are replayed as simulator truth. Scenario-local emitter labels are retained only for offline delay, coverage, and reward bookkeeping; they never enter the scheduler context. Probability of detection and false-alarm results describe the configured ideal detector, not measured RF hardware. The implementation is a research simulator and requires integration with a real receiver, detector, retuning hardware, and real-time runtime before operational use.
