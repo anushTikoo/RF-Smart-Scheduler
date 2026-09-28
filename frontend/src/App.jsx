@@ -36,7 +36,7 @@ function dwellToObservation(dwellItem) {
   const envBands = env.actualEmissionBands || (env.actualEmissionBand ? [env.actualEmissionBand] : []);
   const emissionsList = env.emissions || envBands.map((bId) => {
     const c = BAND_CONFIG && BAND_CONFIG.find((b) => b.id === bId);
-    return { bandId: bId, freq: c ? c.center : '', type: '', pulses: 3 };
+    return { bandId: bId, freq: c ? c.center : '', type: '', pulses: 0 };
   });
 
   const actualEmissionsData = emissionsList.map((e) => {
@@ -46,7 +46,7 @@ function dwellToObservation(dwellItem) {
       freqStr: e.freq,
       freqGhz: parseFloat(e.freq) || (BAND_CONFIG && BAND_CONFIG.find((b) => b.id === e.bandId) ? parseFloat(BAND_CONFIG.find((b) => b.id === e.bandId).center) : null),
       type: e.type,
-      pulses: e.pulses || 3,
+      pulses: e.pulses !== undefined ? e.pulses : 0,
       isDetected: isDetected,
       status: isDetected ? 'DETECTED' : `Missed (Receiver on Band ${bandId})`,
     };
@@ -63,7 +63,7 @@ function dwellToObservation(dwellItem) {
 
   const dwellReward = dwellItem.reward !== undefined
     ? dwellItem.reward
-    : (adapt.reward !== undefined ? adapt.reward : (isHit ? 0.02 : -0.01));
+    : (adapt.reward !== undefined ? adapt.reward : 0.0);
 
   return {
     id: dwellItem.dwellIndex,
@@ -82,7 +82,7 @@ function dwellToObservation(dwellItem) {
     status: result,
     result: result,
     reward: dwellReward,
-    pulsesDetected: adapt.pulsesDetected !== undefined ? adapt.pulsesDetected : (isHit ? 3 : 0),
+    pulsesDetected: adapt.pulsesDetected !== undefined ? adapt.pulsesDetected : (isHit ? 1 : 0),
     isIntercepted: isHit,
     actualBands: envBands,
     actualBand: envBands.length > 0 ? envBands[0] : null,
@@ -169,6 +169,8 @@ export default function App() {
     totalActualEmissions: '-',
   });
 
+  const [modelState, setModelState] = useState(null);
+
   // On mount: check if backend already has a dataset loaded and fetch RL config
   useEffect(() => {
     let isMounted = true;
@@ -246,6 +248,10 @@ export default function App() {
           }
         }
 
+        if (snapshot.modelState) {
+          setModelState(snapshot.modelState);
+        }
+
         // Live Mode (batch): Show the latest 20 dwells window streaming in real-time
         if (snapshot.mode === 'batch' && snapshot.batch) {
           const newEntries = snapshot.batch.map(dwellToObservation).filter(Boolean);
@@ -269,6 +275,7 @@ export default function App() {
               actualEmissionBand: snapshot.environment?.actualEmissionBand || null,
               actualEmissionBands: snapshot.environment?.actualEmissionBands || [],
               emissionFrequency: snapshot.environment?.emissionFrequency || null,
+              modelState: snapshot.modelState || null,
               scrubberTimeMs: latestIdx ? Number((latestIdx * DWELL_DURATION_MS).toFixed(1)) : 0,
             };
           }
@@ -447,6 +454,7 @@ export default function App() {
       if (cached.actualEmissionBand) setActualEmissionBand(cached.actualEmissionBand);
       if (cached.actualEmissionBands) setActualEmissionBands(cached.actualEmissionBands);
       if (cached.emissionFrequency) setEmissionFrequency(cached.emissionFrequency);
+      if (cached.modelState) setModelState(cached.modelState);
       setScrubberTimeMs(cached.scrubberTimeMs || Number((totalDwells * DWELL_DURATION_MS).toFixed(1)));
     } else {
       const finalTime = Number((totalDwells * DWELL_DURATION_MS).toFixed(1));
@@ -857,6 +865,7 @@ export default function App() {
             openLoopMetrics={openLoopMetrics}
             hasDataset={!!loadedDataset}
             config={rlConfig}
+            modelState={modelState}
           />
         </div>
       </main>
