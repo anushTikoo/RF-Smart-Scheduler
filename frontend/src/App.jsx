@@ -351,7 +351,7 @@ export default function App() {
 
   const handleDatasetUpload = async (file) => {
     try {
-      showToast(`Uploading dataset ${file.name} to cognitive backend...`);
+      showToast(`Uploading dataset ${file.name} to backend...`);
       const uploadRes = await uploadDataset(file);
       const datasetInfo = uploadRes.dataset || uploadRes || {};
 
@@ -375,7 +375,7 @@ export default function App() {
       setScrubberTimeMs(0.5);
       setRealTimeSeconds(0);
       setIsScanning(true);
-      showToast(`Dataset loaded: ${file.name}. Starting cognitive RF scan scheduler...`);
+      showToast(`Dataset loaded: ${file.name}. Starting RF scan scheduler...`);
     } catch (err) {
       console.error('Failed to upload dataset:', err);
       showToast(`Failed to upload dataset: ${err.message || err}`);
