@@ -6,11 +6,14 @@ export default function RLParametersAccordion({
   openLoopMetrics = {},
   hasDataset = false,
   config = null,
+  modelState: externalModelState = null,
 }) {
   const [isExpanded, setIsExpanded] = useState(false);
-  const [modelState, setModelState] = useState(null);
+  const [localModelState, setLocalModelState] = useState(null);
 
-  // Poll or fetch model state when expanded or when dataset is loaded
+  const activeModelState = externalModelState || localModelState;
+
+  // Poll or fetch model state when expanded or when dataset is loaded (if not pushed via WS)
   useEffect(() => {
     let isMounted = true;
     async function loadState() {
@@ -18,20 +21,20 @@ export default function RLParametersAccordion({
       try {
         const state = await fetchModelState();
         if (isMounted && state && state.initialized) {
-          setModelState(state);
+          setLocalModelState(state);
         }
       } catch (err) {
         console.debug('Could not load model state:', err);
       }
     }
 
-    if (hasDataset) {
+    if (hasDataset && !externalModelState) {
       loadState();
     }
     return () => {
       isMounted = false;
     };
-  }, [hasDataset, isExpanded, mlMetrics.totalHits]);
+  }, [hasDataset, isExpanded, mlMetrics.totalHits, externalModelState]);
 
   const linCfg = config?.linucb || {};
   const alpha = linCfg.alpha !== undefined ? linCfg.alpha : 0.5;
@@ -39,14 +42,18 @@ export default function RLParametersAccordion({
   const uncertaintyWeight = linCfg.uncertainty_weight !== undefined ? linCfg.uncertainty_weight : 0.75;
   const coverageWeight = linCfg.coverage_bonus_weight !== undefined ? linCfg.coverage_bonus_weight : 1.0;
 
-  const weights = modelState?.weights || {
-    observed_hit_ewma: 0.0165,
-    previous_observed_pulse_count: 0.0042,
-    learned_periodicity: 0.0008,
-    bias: 0.0011,
-    consecutive_no_hits: -0.0020,
-    time_since_visit: -0.0067,
-  };
+  const defaultFeatures = [
+    'bias',
+    'time_since_visit',
+    'observed_hit_ewma',
+    'previous_observed_pulse_count',
+    'consecutive_no_hits',
+    'learned_periodicity',
+  ];
+
+  const weights = activeModelState?.weights && Object.keys(activeModelState.weights).length > 0
+    ? activeModelState.weights
+    : Object.fromEntries(defaultFeatures.map((f) => [f, 0.0]));
 
   const featureDescriptions = {
     observed_hit_ewma: 'EWMA historical hit frequency on band',
@@ -125,13 +132,13 @@ export default function RLParametersAccordion({
                   <div className="flex flex-col gap-1">
                     <span className="text-[11px] text-slate-500 font-medium uppercase tracking-wide">Avg Reward / Dwell</span>
                     <span className="font-mono text-[16px] sm:text-[18px] font-semibold text-primary">
-                      {hasDataset ? (mlMetrics.avgReward && mlMetrics.avgReward !== '-' ? mlMetrics.avgReward : '-0.005') : '-'}
+                      {hasDataset ? (mlMetrics.avgReward && mlMetrics.avgReward !== '-' ? mlMetrics.avgReward : '0.000') : '-'}
                     </span>
                   </div>
                   <div className="flex flex-col gap-1">
                     <span className="text-[11px] text-slate-500 font-medium uppercase tracking-wide">Cumulative Reward</span>
                     <span className="font-mono text-[16px] sm:text-[18px] font-semibold text-slate-800">
-                      {hasDataset ? (mlMetrics.cumulativeReward || '-0.61') : '-'}
+                      {hasDataset ? (mlMetrics.cumulativeReward && mlMetrics.cumulativeReward !== '-' ? mlMetrics.cumulativeReward : '0.00') : '-'}
                     </span>
                   </div>
                   <div className="flex flex-col gap-1">
@@ -161,13 +168,13 @@ export default function RLParametersAccordion({
                   <div className="flex flex-col gap-1">
                     <span className="text-[11px] text-slate-500 font-medium uppercase tracking-wide">Avg Reward / Dwell</span>
                     <span className="font-mono text-[16px] sm:text-[18px] font-semibold text-slate-700">
-                      {hasDataset ? (openLoopMetrics.avgReward && openLoopMetrics.avgReward !== '-' ? openLoopMetrics.avgReward : '-0.006') : '-'}
+                      {hasDataset ? (openLoopMetrics.avgReward && openLoopMetrics.avgReward !== '-' ? openLoopMetrics.avgReward : '0.000') : '-'}
                     </span>
                   </div>
                   <div className="flex flex-col gap-1">
                     <span className="text-[11px] text-slate-500 font-medium uppercase tracking-wide">Cumulative Reward</span>
                     <span className="font-mono text-[16px] sm:text-[18px] font-semibold text-slate-800">
-                      {hasDataset ? (openLoopMetrics.cumulativeReward || '-0.74') : '-'}
+                      {hasDataset ? (openLoopMetrics.cumulativeReward && openLoopMetrics.cumulativeReward !== '-' ? openLoopMetrics.cumulativeReward : '0.00') : '-'}
                     </span>
                   </div>
                   <div className="flex flex-col gap-1">
@@ -249,9 +256,9 @@ export default function RLParametersAccordion({
               <span className="text-[14px] font-semibold text-slate-800 uppercase tracking-wide">
                 Learned Context Feature Weights (θ̂ Vector)
               </span>
-              {modelState && (
+              {activeModelState && (
                 <span className="text-[11px] text-slate-500 font-mono">
-                  {modelState.num_updates || 120} online updates • MSE: {(modelState.reward_prediction_mse || 0.000057).toExponential(2)}
+                  {(activeModelState.num_updates ?? 0)} online updates • MSE: {(activeModelState.reward_prediction_mse ?? 0).toExponential(2)}
                 </span>
               )}
             </div>

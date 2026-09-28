@@ -129,6 +129,20 @@ class SimulationEngine:
         self.compute_complete: bool = False
         self._compute_thread: threading.Thread | None = None
 
+        # Live Ground-Truth Intercept Delay & Revisit Interval Tracking
+        self._ml_seen_emitters: set[int] = set()
+        self._ml_delay_sum: float = 0.0
+        self._ml_delay_count: int = 0
+        self._ol_seen_emitters: set[int] = set()
+        self._ol_delay_sum: float = 0.0
+        self._ol_delay_count: int = 0
+        self._ml_last_visit: list[int] = [-1] * 20
+        self._ml_revisit_sum: float = 0.0
+        self._ml_revisit_count: int = 0
+        self._ol_last_visit: list[int] = [-1] * 20
+        self._ol_revisit_sum: float = 0.0
+        self._ol_revisit_count: int = 0
+
     def load_h5_dataset(self, h5_file_path: str | Path, dataset_label: str = "") -> Dict[str, Any]:
         """Load an HDF5 dataset file, preprocess it into an Episode, and initialize environments."""
         path = Path(h5_file_path)
@@ -268,6 +282,24 @@ class SimulationEngine:
         self.cached_dwells = []
         self.running_detectable_pulses = 0
 
+        # Reset Live Tracking for Intercept Delay and Revisit Interval
+        self._ml_seen_emitters = set()
+        self._ml_delay_sum = 0.0
+        self._ml_delay_count = 0
+
+        self._ol_seen_emitters = set()
+        self._ol_delay_sum = 0.0
+        self._ol_delay_count = 0
+
+        num_bands = self.episode.num_bands if self.episode else 20
+        self._ml_last_visit = [-1] * num_bands
+        self._ml_revisit_sum = 0.0
+        self._ml_revisit_count = 0
+
+        self._ol_last_visit = [-1] * num_bands
+        self._ol_revisit_sum = 0.0
+        self._ol_revisit_count = 0
+
 
     def precompute_dwells(self, max_dwells: int = 1000) -> None:
         """Precompute initial chunk of dwells (default 1000) for instant queries."""
@@ -339,7 +371,7 @@ class SimulationEngine:
                     "bandId": b + 1,
                     "freq": BAND_CENTERS[b],
                     "type": BAND_TYPES[b],
-                    "pulses": p if p > 0 else 3,
+                    "pulses": int(p),
                     "isDetected": (b == a_ml),
                 }
                 for b, p in active_b
@@ -380,6 +412,41 @@ class SimulationEngine:
         ol_avg_r = self.env_ol.total_reward / dwell_number
         ol_intercept_rate = self.env_ol.total_detected_pulses / elapsed_s
 
+        # Live Ground-Truth Average Intercept Delay (from emitter onset to first receiver intercept)
+        for e in np.flatnonzero(self.env_ml.first_detect_step >= 0):
+            if e not in self._ml_seen_emitters:
+                self._ml_seen_emitters.add(e)
+                first_obs = int(self.env_ml.first_observable_step[e])
+                delay_ms = (int(self.env_ml.first_detect_step[e]) - first_obs) * DWELL_DURATION_MS
+                self._ml_delay_sum += max(0.0, delay_ms)
+                self._ml_delay_count += 1
+
+        for e in np.flatnonzero(self.env_ol.first_detect_step >= 0):
+            if e not in self._ol_seen_emitters:
+                self._ol_seen_emitters.add(e)
+                first_obs = int(self.env_ol.first_observable_step[e])
+                delay_ms = (int(self.env_ol.first_detect_step[e]) - first_obs) * DWELL_DURATION_MS
+                self._ol_delay_sum += max(0.0, delay_ms)
+                self._ol_delay_count += 1
+
+        ml_avg_delay = (self._ml_delay_sum / self._ml_delay_count) if self._ml_delay_count > 0 else 0.0
+        ol_avg_delay = (self._ol_delay_sum / self._ol_delay_count) if self._ol_delay_count > 0 else 0.0
+
+        # Live Channel Revisit Intervals (mean elapsed duration between consecutive visits to same channel)
+        if self._ml_last_visit[a_ml] >= 0:
+            revisit_ms = (step_idx - self._ml_last_visit[a_ml]) * DWELL_DURATION_MS
+            self._ml_revisit_sum += revisit_ms
+            self._ml_revisit_count += 1
+        self._ml_last_visit[a_ml] = step_idx
+        ml_mean_revisit = (self._ml_revisit_sum / self._ml_revisit_count) if self._ml_revisit_count > 0 else 0.0
+
+        if self._ol_last_visit[a_ol] >= 0:
+            revisit_ms = (step_idx - self._ol_last_visit[a_ol]) * DWELL_DURATION_MS
+            self._ol_revisit_sum += revisit_ms
+            self._ol_revisit_count += 1
+        self._ol_last_visit[a_ol] = step_idx
+        ol_mean_revisit = (self._ol_revisit_sum / self._ol_revisit_count) if self._ol_revisit_count > 0 else (len(self._ol_last_visit) * DWELL_DURATION_MS)
+
         dwell_item: Dict[str, Any] = {
             "dwellIndex": dwell_number,
             "startMs": start_ms,
@@ -415,10 +482,10 @@ class SimulationEngine:
                     "hitRate": f"{ml_scan_rate:.1f}%",
                     "interceptRate": f"{ml_intercept_rate:.2f} /s",
                     "probDetection": f"{ml_pd:.1f}%",
-                    "avgInterceptDelay": f"{(11.5 + (step_idx % 4) * 0.3):.1f} ms",
+                    "avgInterceptDelay": f"{ml_avg_delay:.1f} ms" if self._ml_delay_count > 0 else "0.0 ms",
                     "avgReward": f"{ml_avg_r:+.3f}",
                     "cumulativeReward": f"{self.env_ml.total_reward:+.2f}",
-                    "meanRevisitInterval": f"{(12.0 + (step_idx % 3) * 0.2):.1f} ms",
+                    "meanRevisitInterval": f"{ml_mean_revisit:.1f} ms" if self._ml_revisit_count > 0 else "0.0 ms",
                     "totalHits": int(self.env_ml.total_detected_pulses),
                     "dwellHits": int(self.env_ml.total_selected_active_steps),
                     "totalScanMisses": int(self.env_ml.total_scan_misses),
@@ -444,10 +511,10 @@ class SimulationEngine:
                     "hitRate": f"{ol_scan_rate:.1f}%",
                     "interceptRate": f"{ol_intercept_rate:.2f} /s",
                     "probDetection": f"{ol_pd:.1f}%",
-                    "avgInterceptDelay": f"{(44.0 + (step_idx % 5) * 0.4):.1f} ms",
+                    "avgInterceptDelay": f"{ol_avg_delay:.1f} ms" if self._ol_delay_count > 0 else "0.0 ms",
                     "avgReward": f"{ol_avg_r:+.3f}",
                     "cumulativeReward": f"{self.env_ol.total_reward:+.2f}",
-                    "meanRevisitInterval": "10.0 ms",
+                    "meanRevisitInterval": f"{ol_mean_revisit:.1f} ms" if self._ol_revisit_count > 0 else f"{(len(self._ol_last_visit) * DWELL_DURATION_MS):.1f} ms",
                     "totalHits": int(self.env_ol.total_detected_pulses),
                     "dwellHits": int(self.env_ol.total_selected_active_steps),
                     "totalScanMisses": int(self.env_ol.total_scan_misses),
@@ -511,6 +578,7 @@ class SimulationEngine:
             "environment": latest["environment"],
             "adaptive": latest["adaptive"],
             "openLoop": latest["openLoop"],
+            "modelState": self.get_linucb_model_state(),
         }
 
     def update_configuration(

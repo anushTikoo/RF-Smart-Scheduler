@@ -141,6 +141,7 @@ async def websocket_telemetry_endpoint(
                                 "environment": dwell["environment"],
                                 "adaptive": dwell["adaptive"],
                                 "openLoop": dwell["openLoop"],
+                                "modelState": engine.get_linucb_model_state(),
                             }
                             await websocket.send_text(json.dumps(snap))
 
@@ -177,6 +178,7 @@ async def websocket_telemetry_endpoint(
                             "environment": dwell["environment"],
                             "adaptive": dwell["adaptive"],
                             "openLoop": dwell["openLoop"],
+                            "modelState": engine.get_linucb_model_state(),
                         }
                         await websocket.send_text(json.dumps(snap))
 
@@ -220,6 +222,7 @@ async def websocket_telemetry_endpoint(
                                 "environment": latest["environment"],
                                 "adaptive": latest["adaptive"],
                                 "openLoop": latest["openLoop"],
+                                "modelState": engine.get_linucb_model_state(),
                             }
                             await websocket.send_text(json.dumps(snapshot))
 
@@ -255,6 +258,7 @@ async def websocket_telemetry_endpoint(
                             "environment": dwell["environment"],
                             "adaptive": dwell["adaptive"],
                             "openLoop": dwell["openLoop"],
+                            "modelState": engine.get_linucb_model_state(),
                         }
                         await websocket.send_text(json.dumps(snapshot))
 

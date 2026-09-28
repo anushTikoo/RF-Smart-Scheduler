@@ -536,9 +536,9 @@ export default function ObservationsSection({
       const resultText = obs.isIntercepted
         ? 'HIT'
         : (isEnv ? (hasEm ? 'SCAN MISS' : 'QUIET MISS') : 'SCAN MISS');
-      const pulses = obs.pulsesDetected !== undefined ? obs.pulsesDetected : (obs.isIntercepted ? 3 : 0);
+      const pulses = obs.pulsesDetected !== undefined ? obs.pulsesDetected : (obs.isIntercepted ? 1 : 0);
       const exactIntercepted = obs.isIntercepted ? (obs.interceptedFreq && obs.interceptedFreq !== '-' ? obs.interceptedFreq : obs.centerFreq) : '-';
-      const dwellReward = obs.reward !== undefined ? Number(obs.reward) : (obs.isIntercepted ? 0.02 : -0.01);
+      const dwellReward = obs.reward !== undefined ? Number(obs.reward) : 0.0;
       const rewardStr = dwellReward > 0 ? `+${dwellReward.toFixed(2)}` : dwellReward.toFixed(2);
 
       const emissionStr = obs.actualEmissions && obs.actualEmissions.length > 0
